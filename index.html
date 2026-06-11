@@ -400,6 +400,38 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--gold-light);margin-bottom:6px;">Copa do Mundo 2026 — Bolão</div>
     <div style="font-size:.85rem;color:var(--text-dim);line-height:1.65;">Acerte os placares, acumule pontos e ganhe o prêmio. Boa sorte! 🏆</div>
   </div>
+
+  <div class="card"><div class="card-header"><h2>⏱️ Prazo de Palpites</h2></div><div class="card-body">
+    <div style="background:rgba(230,57,70,.08);border:1px solid rgba(230,57,70,.25);border-radius:10px;padding:16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start;">
+      <div style="font-size:1.8rem;flex-shrink:0;">🔒</div>
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;margin-bottom:4px;">Bloqueio automático 10 minutos antes</div>
+        <div style="font-size:.82rem;color:var(--text-dim);line-height:1.6;">Os palpites de cada jogo são bloqueados automaticamente <strong style="color:var(--text);">10 minutos antes do apito inicial</strong>. Após esse prazo, o campo fica travado e nenhuma alteração é aceita.</div>
+      </div>
+    </div>
+    <div class="regra-item">
+      <div class="regra-icon">✏️</div>
+      <div>
+        <div class="regra-title">Edição livre até o prazo</div>
+        <div class="regra-desc">Você pode alterar seus palpites quantas vezes quiser até 10 minutos antes de cada jogo. Não há limite de edições.</div>
+      </div>
+    </div>
+    <div class="regra-item">
+      <div class="regra-icon">⚙️</div>
+      <div>
+        <div class="regra-title">Bloqueio por jogo individual</div>
+        <div class="regra-desc">O bloqueio é aplicado jogo a jogo. Um jogo travado não impede o palpite dos demais jogos do dia.</div>
+      </div>
+    </div>
+    <div class="regra-item" style="border-bottom:none;">
+      <div class="regra-icon">💾</div>
+      <div>
+        <div class="regra-title">Salve com antecedência</div>
+        <div class="regra-desc">Preencha e salve seus palpites com antecedência. Use o botão <strong style="color:var(--text);">💾 Salvar tudo</strong> para garantir que todos foram registrados.</div>
+      </div>
+    </div>
+  </div></div>
+
   <div class="card"><div class="card-header"><h2>🎯 Pontuação</h2></div><div class="card-body">
     <div class="pts-card pts-5"><div class="pts-val">5</div><div><div class="pts-title">⭐ Placar Exato</div><div class="pts-ex">Real 2×1 · Palpite 2×1</div><div class="pts-desc">Acertou o placar completo.</div></div></div>
     <div class="pts-card pts-3"><div class="pts-val">3</div><div><div class="pts-title">✅ Vencedor + Diferença</div><div class="pts-ex">Real 3×1 · Palpite 2×0</div><div class="pts-desc">Acertou o vencedor e o saldo de gols.</div></div></div>
@@ -803,11 +835,28 @@ function renderJogos() {
   count.textContent = state.jogos.length + ' jogos';
   if (!state.jogos.length) { lista.innerHTML = '<div class="empty"><div class="eico">🏟</div><p>Nenhum jogo cadastrado.</p></div>'; return; }
   const isAdmin = session.role === 'admin';
-  lista.innerHTML = state.jogos.map(j => {
+
+  // Ordena por data → hora
+  const jogosOrdenados = [...state.jogos].sort((a, b) => {
+    const da = parseDataHora(a.data || '', a.hora || '00:00');
+    const db = parseDataHora(b.data || '', b.hora || '00:00');
+    return da - db;
+  });
+
+  let lastData = null;
+  lista.innerHTML = jogosOrdenados.map(j => {
     const fin = j.realA !== null && j.realA !== undefined;
-    return `
+    let separador = '';
+    if (j.data && j.data !== lastData) {
+      lastData = j.data;
+      separador = `<div style="font-size:.7rem;font-family:'Barlow Condensed',sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin:12px 0 6px;padding-left:2px;">${formatarData(j.data)}</div>`;
+    }
+    return separador + `
       <div class="jogo-card ${fin?'fim':''}">
-        <div class="jogo-meta">${j.data?`<span>${j.data}</span>`:''}${j.fase?`<span class="fase-badge">${j.fase}</span>`:''}</div>
+        <div class="jogo-meta">
+          ${j.hora?`<span style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.75rem;">${j.hora}</span>`:''}
+          ${j.fase?`<span class="fase-badge">${j.fase}</span>`:''}
+        </div>
         <div class="jogo-times">
           <div class="jogo-team">${j.timeA}</div>
           <div>${fin?`<div class="jogo-placar">${j.realA}–${j.realB}</div>`:`<div class="jogo-vs">VS</div>`}</div>
@@ -865,20 +914,23 @@ function openPalpiteModal(jid) {
     }
     const pal = (state.palpites[jid]||{})[p.id]||{};
     const fin = j.realA !== null && j.realA !== undefined;
+    const bloqueado = isJogoBloqueado(j);
     document.getElementById('mpal-body').innerHTML = `
       <div style="text-align:center;margin-bottom:16px;font-family:'Barlow Condensed',sans-serif;font-size:.9rem;color:var(--text-dim);">Seu palpite para este jogo:</div>
       <div class="placar-row">
         <div style="text-align:center;"><div style="font-size:.78rem;color:var(--text-dim);margin-bottom:4px;">${j.timeA}</div>
-          <input type="number" class="placar-input" id="meu-pal-a" value="${pal.a??''}" min="0" max="30" inputmode="numeric" placeholder="?" ${fin?'disabled':''}/>
+          <input type="number" class="placar-input" id="meu-pal-a" value="${pal.a??''}" min="0" max="30" inputmode="numeric" placeholder="?" ${fin||bloqueado?'disabled':''}/>
         </div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--text-dim);margin-top:16px;">×</div>
         <div style="text-align:center;"><div style="font-size:.78rem;color:var(--text-dim);margin-bottom:4px;">${j.timeB}</div>
-          <input type="number" class="placar-input" id="meu-pal-b" value="${pal.b??''}" min="0" max="30" inputmode="numeric" placeholder="?" ${fin?'disabled':''}/>
+          <input type="number" class="placar-input" id="meu-pal-b" value="${pal.b??''}" min="0" max="30" inputmode="numeric" placeholder="?" ${fin||bloqueado?'disabled':''}/>
         </div>
       </div>
       ${fin
         ? `<div class="info-box" style="text-align:center;">Jogo finalizado. Resultado: <strong>${j.realA}×${j.realB}</strong></div>`
-        : `<button class="btn btn-gold btn-full" style="margin-top:14px;" onclick="saveMyPalpite('${jid}','${p.id}')">💾 Salvar Meu Palpite</button>`}
+        : bloqueado
+          ? `<div class="warn-box" style="text-align:center;">🔒 Palpites encerrados — menos de 10 minutos para o início da partida.</div>`
+          : `<button class="btn btn-gold btn-full" style="margin-top:14px;" onclick="saveMyPalpite('${jid}','${p.id}')">💾 Salvar Meu Palpite</button>`}
       <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="closeModal('modal-palpite')">Fechar</button>`;
   }
   openModal('modal-palpite');
@@ -1057,13 +1109,14 @@ function renderPalpites() {
                     id="pi-${j.id}-a" value="${ga}" min="0" max="30" inputmode="numeric" placeholder="?"
                     data-jid="${j.id}" data-lado="a" data-pid="${p.id}" data-r="${r}"
                     oninput="onPalInput(this)" onfocus="this.select()"
-                    ${preench ? 'disabled style="opacity: 0.65; cursor: not-allowed; background: var(--bg3); border-color: transparent;"' : ''}/>
+                    ${isJogoBloqueado(j) ? 'disabled' : ''}/>
                   <span class="pal-sep">×</span>
                   <input type="number" class="pal-score ${gb!==''?'filled':''}"
                     id="pi-${j.id}-b" value="${gb}" min="0" max="30" inputmode="numeric" placeholder="?"
                     data-jid="${j.id}" data-lado="b" data-pid="${p.id}" data-r="${r}"
                     oninput="onPalInput(this)" onfocus="this.select()"
-                    ${preench ? 'disabled style="opacity: 0.65; cursor: not-allowed; background: var(--bg3); border-color: transparent;"' : ''}/>
+                    ${isJogoBloqueado(j) ? 'disabled' : ''}/>
+                  ${isJogoBloqueado(j) ? '<div style="font-size:.65rem;color:#ff8a8a;text-align:center;margin-top:4px;width:100%;">🔒 Encerrado</div>' : ''}
               `}
             </div>
             <div class="pal-team right">${j.timeB||j.tB}</div>
@@ -1149,7 +1202,10 @@ function onPalInput(el) {
 async function salvarPalpiteInline(jid, pid) {
   const a = document.getElementById(`pi-${jid}-a`)?.value ?? '';
   const b = document.getElementById(`pi-${jid}-b`)?.value ?? '';
-  if (a===''||b==='') return; // só salva quando ambos preenchidos
+  if (a===''||b==='') return;
+  // Verifica bloqueio por horário
+  const jogo = (state.jogos.length ? state.jogos : JOGOS_PADRAO).find(j => j.id === jid);
+  if (jogo && isJogoBloqueado(jogo)) { toast('🔒 Palpite encerrado para este jogo.'); return; }
   await fbSet(`palpites/${jid}/${pid}`, { a:parseInt(a), b:parseInt(b) });
 }
 
@@ -1212,6 +1268,33 @@ function atualizarProgressoInline(pid, r) {
     const cnt = document.getElementById(`rcnt-${r}`);
     if (cnt) cnt.textContent = `${doneR}/${jogosR.length}`;
   }
+}
+
+// ══════════════════════════════════════════
+// BLOQUEIO DE PALPITE — 10 MIN ANTES DO JOGO
+// ══════════════════════════════════════════
+function isJogoBloqueado(jogo) {
+  // Jogo já finalizado também bloqueia
+  if (jogo.realA !== null && jogo.realA !== undefined) return true;
+
+  const data  = jogo.data || jogo.d || '';
+  const hora  = jogo.hora || jogo.h || '';
+  if (!data || !hora) return false;
+
+  // Monta datetime do jogo em 2026 (horário de Brasília = UTC-3)
+  // data: "11/06", hora: "13h" ou "13:00"
+  const [d, m] = data.split('/').map(Number);
+  const hStr = hora.replace('h',':').replace(':','');
+  const hNum  = parseInt(hora) || 0;
+  const minNum = parseInt((hora.includes(':') ? hora.split(':')[1] : '0')) || 0;
+
+  // Data/hora em UTC (Brasília = UTC-3, então adiciona 3h)
+  const jogoUTC = Date.UTC(2026, m - 1, d, hNum + 3, minNum, 0);
+
+  const agora = Date.now();
+  const dez_minutos_ms = 10 * 60 * 1000;
+
+  return agora >= jogoUTC - dez_minutos_ms;
 }
 
 function extrairRodada(fase) {
