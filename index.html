@@ -1096,9 +1096,9 @@ function renderPalpites() {
       html += `
         <div class="pal-jogo-card ${preench?'pal-ok':''} ${fin?'pal-fin':''}" id="pcard-${j.id}">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-            <span style="font-size:.68rem;color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;">${j.hora||''}</span>
-            <span style="font-size:.68rem;color:var(--text-dim);">•</span>
+            ${(j.hora||j.h) ? `<span style="font-size:.72rem;font-weight:700;color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">🕐 ${j.hora||j.h}</span><span style="font-size:.68rem;color:var(--text-dim);">•</span>` : ''}
             <span style="font-size:.68rem;background:rgba(0,104,71,.2);color:var(--green-light);border:1px solid rgba(0,104,71,.3);border-radius:4px;padding:1px 6px;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;">Grupo ${j.grupo}</span>
+            ${isJogoBloqueado(j)&&!fin ? `<span style="font-size:.65rem;color:#ff8a8a;margin-left:auto;">🔒 Encerrado</span>` : ''}
           </div>
           <div class="pal-jogo-grid">
             <div class="pal-team">${j.timeA||j.tA}</div>
