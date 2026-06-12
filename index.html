@@ -341,9 +341,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="card-body">
       <div class="form-group"><label>Time A</label><input type="text" id="j-timeA" placeholder="Ex: Brasil" autocomplete="off"/></div>
       <div class="form-group"><label>Time B</label><input type="text" id="j-timeB" placeholder="Ex: Argentina" autocomplete="off"/></div>
-      <div class="form-group"><label>Data</label><input type="text" id="j-data" placeholder="Ex: 13/06/2026"/></div>
-      <div class="form-group"><label>Fase</label><input type="text" id="j-fase" placeholder="Ex: Grupos C"/></div>
+      <div class="form-group"><label>Data</label><input type="text" id="j-data" placeholder="Ex: 13/06"/></div>
+      <div class="form-group"><label>Horário</label><input type="text" id="j-hora" placeholder="Ex: 16h"/></div>
+      <div class="form-group"><label>Fase / Grupo</label><input type="text" id="j-fase" placeholder="Ex: Grupo C"/></div>
       <button class="btn btn-gold btn-full" onclick="addJogo()">+ Cadastrar Jogo</button>
+    </div>
+  </div>
+  <div class="card" id="card-fix-horarios" style="display:none;">
+    <div class="card-body">
+      <div class="warn-box" style="margin-top:0;margin-bottom:10px;" id="fix-horarios-msg"></div>
+      <button class="btn btn-gold btn-full" onclick="fixHorarios()">🕐 Corrigir Horários Automaticamente</button>
     </div>
   </div>
   <div class="card">
@@ -768,11 +775,12 @@ async function addJogo() {
   const timeA = document.getElementById('j-timeA').value.trim();
   const timeB = document.getElementById('j-timeB').value.trim();
   const data  = document.getElementById('j-data').value.trim();
+  const hora  = document.getElementById('j-hora').value.trim();
   const fase  = document.getElementById('j-fase').value.trim();
   if (!timeA || !timeB) return toast('⚠️ Informe os dois times');
   const id = 'j_' + Date.now();
-  await fbSet(`jogos/${id}`, { id, timeA, timeB, data, fase, realA: null, realB: null });
-  ['j-timeA','j-timeB','j-data','j-fase'].forEach(i => document.getElementById(i).value = '');
+  await fbSet(`jogos/${id}`, { id, timeA, timeB, data, hora, fase, realA: null, realB: null });
+  ['j-timeA','j-timeB','j-data','j-hora','j-fase'].forEach(i => document.getElementById(i).value = '');
   toast('✅ Jogo cadastrado!');
 }
 window.addJogo = addJogo;
@@ -833,6 +841,21 @@ function renderJogos() {
   const count = document.getElementById('j-count');
   if (!lista) return;
   count.textContent = state.jogos.length + ' jogos';
+
+  // Mostra/oculta card de correção de horários (só admin)
+  const fixCard = document.getElementById('card-fix-horarios');
+  if (fixCard) {
+    const isAdmin = session.role === 'admin';
+    const semHora = countJogosSemHora();
+    if (isAdmin && semHora > 0) {
+      fixCard.style.display = '';
+      document.getElementById('fix-horarios-msg').textContent =
+        `⚠️ ${semHora} jogo(s) sem horário cadastrado. Clique para corrigir automaticamente.`;
+    } else {
+      fixCard.style.display = 'none';
+    }
+  }
+
   if (!state.jogos.length) { lista.innerHTML = '<div class="empty"><div class="eico">🏟</div><p>Nenhum jogo cadastrado.</p></div>'; return; }
   const isAdmin = session.role === 'admin';
 
@@ -1568,49 +1591,99 @@ function renderDashboard() {
 // ══════════════════════════════════════════
 async function seedJogos2026() {
   const jogos=[
-    ['México','África do Sul','11/06','Grupo A'],['Rep. da Coreia','Rep. Tcheca','11/06','Grupo A'],
-    ['Canadá','Bósnia e Herz.','12/06','Grupo B'],['Estados Unidos','Paraguai','12/06','Grupo D'],
-    ['Catar','Suíça','13/06','Grupo B'],['Brasil','Marrocos','13/06','Grupo C'],
-    ['Haiti','Escócia','13/06','Grupo C'],['Austrália','Turquia','13/06','Grupo D'],
-    ['Alemanha','Curaçau','14/06','Grupo E'],['Costa do Marfim','Equador','14/06','Grupo E'],
-    ['Holanda','Japão','14/06','Grupo F'],['Suécia','Tunísia','14/06','Grupo F'],
-    ['Espanha','Cabo Verde','15/06','Grupo H'],['Arábia Saudita','Uruguai','15/06','Grupo H'],
-    ['Bélgica','Egito','15/06','Grupo G'],['Irã','Nova Zelândia','15/06','Grupo G'],
-    ['Áustria','Jordânia','16/06','Grupo J'],['França','Senegal','16/06','Grupo I'],
-    ['Iraque','Noruega','16/06','Grupo I'],['Argentina','Argélia','16/06','Grupo J'],
-    ['Portugal','Rep. Dem. Congo','17/06','Grupo K'],['Inglaterra','Croácia','17/06','Grupo L'],
-    ['Gana','Panamá','17/06','Grupo L'],['Uzbequistão','Colômbia','17/06','Grupo K'],
-    ['Rep. Tcheca','África do Sul','18/06','Grupo A'],['Suíça','Bósnia e Herz.','18/06','Grupo B'],
-    ['Canadá','Catar','18/06','Grupo B'],['México','Rep. da Coreia','18/06','Grupo A'],
-    ['Turquia','Paraguai','19/06','Grupo D'],['Estados Unidos','Austrália','19/06','Grupo D'],
-    ['Escócia','Marrocos','19/06','Grupo C'],['Brasil','Haiti','19/06','Grupo C'],
-    ['Tunísia','Japão','20/06','Grupo F'],['Holanda','Suécia','20/06','Grupo F'],
-    ['Alemanha','Costa do Marfim','20/06','Grupo E'],['Equador','Curaçau','20/06','Grupo E'],
-    ['Espanha','Arábia Saudita','21/06','Grupo H'],['Bélgica','Irã','21/06','Grupo G'],
-    ['Uruguai','Cabo Verde','21/06','Grupo H'],['Nova Zelândia','Egito','21/06','Grupo G'],
-    ['Argentina','Áustria','22/06','Grupo J'],['França','Iraque','22/06','Grupo I'],
-    ['Noruega','Senegal','22/06','Grupo I'],['Jordânia','Argélia','22/06','Grupo J'],
-    ['Portugal','Uzbequistão','23/06','Grupo K'],['Inglaterra','Gana','23/06','Grupo L'],
-    ['Panamá','Croácia','23/06','Grupo L'],['Colômbia','Rep. Dem. Congo','23/06','Grupo K'],
-    ['Suíça','Canadá','24/06','Grupo B'],['Bósnia e Herz.','Catar','24/06','Grupo B'],
-    ['Escócia','Brasil','24/06','Grupo C'],['Marrocos','Haiti','24/06','Grupo C'],
-    ['Rep. Tcheca','México','24/06','Grupo A'],['África do Sul','Rep. da Coreia','24/06','Grupo A'],
-    ['Equador','Alemanha','25/06','Grupo E'],['Curaçau','Costa do Marfim','25/06','Grupo E'],
-    ['Japão','Suécia','25/06','Grupo F'],['Tunísia','Holanda','25/06','Grupo F'],
-    ['Turquia','Estados Unidos','25/06','Grupo D'],['Paraguai','Austrália','25/06','Grupo D'],
-    ['Noruega','França','26/06','Grupo I'],['Senegal','Iraque','26/06','Grupo I'],
-    ['Cabo Verde','Arábia Saudita','26/06','Grupo H'],['Uruguai','Espanha','26/06','Grupo H'],
-    ['Egito','Irã','26/06','Grupo G'],['Nova Zelândia','Bélgica','26/06','Grupo G'],
-    ['Panamá','Inglaterra','27/06','Grupo L'],['Croácia','Gana','27/06','Grupo L'],
-    ['Colômbia','Portugal','27/06','Grupo K'],['Rep. Dem. Congo','Uzbequistão','27/06','Grupo K'],
-    ['Argélia','Áustria','27/06','Grupo J'],['Jordânia','Argentina','27/06','Grupo J'],
+    ['México','África do Sul','11/06','13h','Grupo A'],['Rep. da Coreia','Rep. Tcheca','11/06','16h','Grupo A'],
+    ['Canadá','Bósnia e Herz.','12/06','13h','Grupo B'],['Estados Unidos','Paraguai','12/06','16h','Grupo D'],
+    ['Catar','Suíça','13/06','13h','Grupo B'],['Brasil','Marrocos','13/06','16h','Grupo C'],
+    ['Haiti','Escócia','13/06','19h','Grupo C'],['Austrália','Turquia','13/06','22h','Grupo D'],
+    ['Alemanha','Curaçau','14/06','13h','Grupo E'],['Costa do Marfim','Equador','14/06','16h','Grupo E'],
+    ['Holanda','Japão','14/06','19h','Grupo F'],['Suécia','Tunísia','14/06','22h','Grupo F'],
+    ['Espanha','Cabo Verde','15/06','13h','Grupo H'],['Arábia Saudita','Uruguai','15/06','16h','Grupo H'],
+    ['Bélgica','Egito','15/06','19h','Grupo G'],['Irã','Nova Zelândia','15/06','22h','Grupo G'],
+    ['Áustria','Jordânia','16/06','13h','Grupo J'],['França','Senegal','16/06','16h','Grupo I'],
+    ['Iraque','Noruega','16/06','19h','Grupo I'],['Argentina','Argélia','16/06','22h','Grupo J'],
+    ['Portugal','Rep. Dem. Congo','17/06','13h','Grupo K'],['Inglaterra','Croácia','17/06','16h','Grupo L'],
+    ['Gana','Panamá','17/06','19h','Grupo L'],['Uzbequistão','Colômbia','17/06','22h','Grupo K'],
+    ['Rep. Tcheca','África do Sul','18/06','13h','Grupo A'],['Suíça','Bósnia e Herz.','18/06','16h','Grupo B'],
+    ['Canadá','Catar','18/06','19h','Grupo B'],['México','Rep. da Coreia','18/06','22h','Grupo A'],
+    ['Turquia','Paraguai','19/06','13h','Grupo D'],['Estados Unidos','Austrália','19/06','16h','Grupo D'],
+    ['Escócia','Marrocos','19/06','19h','Grupo C'],['Brasil','Haiti','19/06','22h','Grupo C'],
+    ['Tunísia','Japão','20/06','13h','Grupo F'],['Holanda','Suécia','20/06','16h','Grupo F'],
+    ['Alemanha','Costa do Marfim','20/06','19h','Grupo E'],['Equador','Curaçau','20/06','22h','Grupo E'],
+    ['Espanha','Arábia Saudita','21/06','13h','Grupo H'],['Bélgica','Irã','21/06','16h','Grupo G'],
+    ['Uruguai','Cabo Verde','21/06','19h','Grupo H'],['Nova Zelândia','Egito','21/06','22h','Grupo G'],
+    ['Argentina','Áustria','22/06','13h','Grupo J'],['França','Iraque','22/06','16h','Grupo I'],
+    ['Noruega','Senegal','22/06','19h','Grupo I'],['Jordânia','Argélia','22/06','22h','Grupo J'],
+    ['Portugal','Uzbequistão','23/06','13h','Grupo K'],['Inglaterra','Gana','23/06','16h','Grupo L'],
+    ['Panamá','Croácia','23/06','19h','Grupo L'],['Colômbia','Rep. Dem. Congo','23/06','22h','Grupo K'],
+    ['Suíça','Canadá','24/06','16h','Grupo B'],['Bósnia e Herz.','Catar','24/06','16h','Grupo B'],
+    ['Escócia','Brasil','24/06','20h','Grupo C'],['Marrocos','Haiti','24/06','20h','Grupo C'],
+    ['Rep. Tcheca','México','24/06','22h','Grupo A'],['África do Sul','Rep. da Coreia','24/06','22h','Grupo A'],
+    ['Equador','Alemanha','25/06','16h','Grupo E'],['Curaçau','Costa do Marfim','25/06','16h','Grupo E'],
+    ['Japão','Suécia','25/06','20h','Grupo F'],['Tunísia','Holanda','25/06','20h','Grupo F'],
+    ['Turquia','Estados Unidos','25/06','22h','Grupo D'],['Paraguai','Austrália','25/06','22h','Grupo D'],
+    ['Noruega','França','26/06','16h','Grupo I'],['Senegal','Iraque','26/06','16h','Grupo I'],
+    ['Cabo Verde','Arábia Saudita','26/06','20h','Grupo H'],['Uruguai','Espanha','26/06','20h','Grupo H'],
+    ['Egito','Irã','26/06','22h','Grupo G'],['Nova Zelândia','Bélgica','26/06','22h','Grupo G'],
+    ['Panamá','Inglaterra','27/06','16h','Grupo L'],['Croácia','Gana','27/06','16h','Grupo L'],
+    ['Colômbia','Portugal','27/06','20h','Grupo K'],['Rep. Dem. Congo','Uzbequistão','27/06','20h','Grupo K'],
+    ['Argélia','Áustria','27/06','22h','Grupo J'],['Jordânia','Argentina','27/06','22h','Grupo J'],
   ];
   const updates={};
-  jogos.forEach(([tA,tB,data,fase])=>{
+  jogos.forEach(([tA,tB,data,hora,fase])=>{
     const id='j_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-    updates[`${session.bolaoId}/jogos/${id}`]={id,timeA:tA,timeB:tB,data,fase,realA:null,realB:null};
+    updates[`${session.bolaoId}/jogos/${id}`]={id,timeA:tA,timeB:tB,data,hora,fase,realA:null,realB:null};
   });
   await update(ref(db),updates);
+}
+
+// ══════════════════════════════════════════
+// CORRIGIR HORÁRIOS DE JOGOS JÁ CADASTRADOS
+// (jogos antigos no Firebase não tinham campo "hora")
+// ══════════════════════════════════════════
+async function fixHorarios() {
+  if (session.role !== 'admin') return;
+
+  // Mapa de horários por times+data (vindo da lista oficial JOGOS_PADRAO)
+  const mapa = {};
+  JOGOS_PADRAO.forEach(j => {
+    const key = `${normTxt(j.timeA)}|${normTxt(j.timeB)}|${j.data}`;
+    mapa[key] = j.hora;
+  });
+
+  const updates = {};
+  let corrigidos = 0, semHora = 0;
+
+  state.jogos.forEach(j => {
+    if (j.hora) return; // já tem horário, não toca
+    const key = `${normTxt(j.timeA)}|${normTxt(j.timeB)}|${j.data}`;
+    const hora = mapa[key];
+    if (hora) {
+      updates[`jogos/${j.id}/hora`] = hora;
+      corrigidos++;
+    } else {
+      semHora++;
+    }
+  });
+
+  if (!corrigidos) {
+    toast(semHora ? `⚠️ ${semHora} jogo(s) sem correspondência. Verifique nomes/datas.` : '✅ Todos os jogos já têm horário!');
+    return;
+  }
+
+  await fbUpdate('', updates);
+  toast(`✅ ${corrigidos} jogo(s) corrigido(s) com horário!${semHora ? ` (${semHora} sem correspondência)` : ''}`);
+}
+window.fixHorarios = fixHorarios;
+
+function normTxt(s) {
+  return (s||'').toLowerCase().trim()
+    .replace(/á|à|â|ã/g,'a').replace(/é|ê/g,'e').replace(/í/g,'i')
+    .replace(/ó|ô|õ/g,'o').replace(/ú/g,'u').replace(/ç/g,'c');
+}
+
+// Conta quantos jogos faltam horário (para exibir aviso no admin)
+function countJogosSemHora() {
+  return state.jogos.filter(j => !j.hora).length;
 }
 
 // ══════════════════════════════════════════
