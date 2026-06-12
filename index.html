@@ -999,7 +999,12 @@ function renderPalpites() {
       c.innerHTML = '<div class="empty"><div class="eico">🎯</div><p>Cadastre participantes e jogos primeiro.</p></div>'; return;
     }
     const hdr = state.participantes.map(p => `<th>${p.nome}</th>`).join('');
-    const rows = state.jogos.map(j => {
+    const jogosOrdenadosAdm = [...state.jogos].sort((a, b) => {
+      const da = parseDataHora(a.data || '', a.hora || '00:00');
+      const db = parseDataHora(b.data || '', b.hora || '00:00');
+      return da - db;
+    });
+    const rows = jogosOrdenadosAdm.map(j => {
       const fin = j.realA !== null && j.realA !== undefined;
       const cells = state.participantes.map(p => {
         const pal = (state.palpites[j.id]||{})[p.id]||{};
@@ -1010,7 +1015,8 @@ function renderPalpites() {
         return `<td><span class="${cls}">${pal.a}×${pal.b}${fin?` <small>(${pts})</small>`:''}</span></td>`;
       }).join('');
       const label = fin?`<span class="pill pill-green" style="font-size:.65rem;">${j.realA}×${j.realB}</span>`:'';
-      return `<tr><td style="white-space:nowrap;font-size:.8rem;"><strong>${j.timeA}</strong> ${label} <strong>${j.timeB}</strong></td>${cells}</tr>`;
+      const meta = [j.data, j.hora].filter(Boolean).join(' ');
+      return `<tr><td style="white-space:nowrap;font-size:.8rem;">${meta?`<div style="font-size:.65rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;">${meta}</div>`:''}<strong>${j.timeA}</strong> ${label} <strong>${j.timeB}</strong></td>${cells}</tr>`;
     }).join('');
     c.innerHTML = `<div class="card"><div class="card-header"><h2>Todos os Palpites</h2></div>
       <div class="pal-scroll"><table class="pal-table"><thead><tr><th>Jogo</th>${hdr}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
