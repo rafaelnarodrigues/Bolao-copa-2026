@@ -216,6 +216,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .pal-sep{font-size:1rem;font-weight:700;color:var(--text-dim);flex-shrink:0}
 .pal-resultado{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold-light);text-align:center;letter-spacing:2px}
 .pal-pts-badge{font-size:.72rem;text-align:center;margin-top:6px}
+.pal-outros{margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
+.pal-outros summary{cursor:pointer;font-size:.75rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;list-style:none;display:flex;align-items:center;gap:4px;-webkit-tap-highlight-color:transparent}
+.pal-outros summary::-webkit-details-marker{display:none}
+.pal-outros summary::after{content:'▾';margin-left:auto;font-size:.7rem;transition:transform .2s}
+.pal-outros[open] summary::after{transform:rotate(180deg)}
+.pal-outros summary:active{color:var(--gold-light)}
 .rodada-hdr{display:flex;align-items:center;gap:10px;margin:18px 0 10px}
 .rodada-hdr-label{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--text)}
 .rodada-hdr-sub{font-size:.72rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif}
@@ -350,7 +356,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="card" id="card-fix-horarios" style="display:none;">
     <div class="card-body">
       <div class="warn-box" style="margin-top:0;margin-bottom:10px;" id="fix-horarios-msg"></div>
-      <button class="btn btn-gold btn-full" onclick="fixHorarios()">🕐 Corrigir Horários Automaticamente</button>
+      <button class="btn btn-gold btn-full" onclick="fixHorarios()">🕐 Atualizar Datas/Horários Oficiais (FIFA)</button>
     </div>
   </div>
   <div class="card">
@@ -435,6 +441,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div>
         <div class="regra-title">Salve com antecedência</div>
         <div class="regra-desc">Preencha e salve seus palpites com antecedência. Use o botão <strong style="color:var(--text);">💾 Salvar tudo</strong> para garantir que todos foram registrados.</div>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="card"><div class="card-header"><h2>👥 Palpites dos Outros</h2></div><div class="card-body">
+    <div class="regra-item" style="border-bottom:none;">
+      <div class="regra-icon">👁️</div>
+      <div>
+        <div class="regra-title">Veja o que os outros palpitaram</div>
+        <div class="regra-desc">Em cada jogo, toque em <strong style="color:var(--text);">"Ver palpites"</strong> para ver o placar que cada participante registrou. Só aparecem palpites já salvos — você não pode editar os palpites de outras pessoas.</div>
       </div>
     </div>
   </div></div>
@@ -850,7 +866,7 @@ function renderJogos() {
     if (isAdmin && semHora > 0) {
       fixCard.style.display = '';
       document.getElementById('fix-horarios-msg').textContent =
-        `⚠️ ${semHora} jogo(s) sem horário cadastrado. Clique para corrigir automaticamente.`;
+        `⚠️ ${semHora} jogo(s) com data/horário diferente da tabela oficial da FIFA. Clique para atualizar.`;
     } else {
       fixCard.style.display = 'none';
     }
@@ -1151,6 +1167,7 @@ function renderPalpites() {
             <div class="pal-team right">${j.timeB||j.tB}</div>
           </div>
           ${pts !== null ? `<div class="pal-pts-badge" style="margin-top:6px;"><span class="${ptsCls}">${ptsIcon} ${pts} pts</span></div>` : ''}
+          ${renderOutrosPalpites(j, p.id)}
         </div>`;
     });
   });
@@ -1300,30 +1317,60 @@ function atualizarProgressoInline(pid, r) {
 }
 
 // ══════════════════════════════════════════
-// BLOQUEIO DE PALPITE — 10 MIN ANTES DO JOGO
+// DATA/HORA REAL DO JOGO + BLOQUEIO 10 MIN ANTES
 // ══════════════════════════════════════════
-function isJogoBloqueado(jogo) {
-  // Jogo já finalizado também bloqueia
-  if (jogo.realA !== null && jogo.realA !== undefined) return true;
 
-  const data  = jogo.data || jogo.d || '';
-  const hora  = jogo.hora || jogo.h || '';
-  if (!data || !hora) return false;
+// Converte data ("DD/MM") + hora ("HHh" ou "HHhMM" ou "HH:MM") em um
+// objeto Date real (horário de Brasília, UTC-3), ano 2026.
+// Também é possível passar um campo ISO direto (jogo.iso = "2026-06-13T19:00:00")
+// que tem prioridade se existir.
+function dataISOJogo(jogo) {
+  if (jogo.iso) {
+    const d = new Date(jogo.iso);
+    if (!isNaN(d.getTime())) return d;
+  }
 
-  // Monta datetime do jogo em 2026 (horário de Brasília = UTC-3)
-  // data: "11/06", hora: "13h" ou "13:00"
+  const data = jogo.data || jogo.d || '';
+  const hora = jogo.hora || jogo.h || '';
+  if (!data) return null;
+
   const [d, m] = data.split('/').map(Number);
-  const hStr = hora.replace('h',':').replace(':','');
-  const hNum  = parseInt(hora) || 0;
-  const minNum = parseInt((hora.includes(':') ? hora.split(':')[1] : '0')) || 0;
+  if (!d || !m) return null;
 
-  // Data/hora em UTC (Brasília = UTC-3, então adiciona 3h)
-  const jogoUTC = Date.UTC(2026, m - 1, d, hNum + 3, minNum, 0);
+  // Extrai horas e minutos de formatos "20h30", "20h", "20:30"
+  let hNum = 0, minNum = 0;
+  const hm = hora.match(/(\d{1,2})\s*[h:]\s*(\d{1,2})?/i);
+  if (hm) {
+    hNum = parseInt(hm[1]) || 0;
+    minNum = parseInt(hm[2]) || 0;
+  }
 
-  const agora = Date.now();
-  const dez_minutos_ms = 10 * 60 * 1000;
+  // Brasília = UTC-3 → soma 3h para obter o horário em UTC
+  return new Date(Date.UTC(2026, m - 1, d, hNum + 3, minNum, 0));
+}
 
-  return agora >= jogoUTC - dez_minutos_ms;
+// Retorna a string ISO (UTC) do jogo, para uso com new Date() em qualquer lugar
+function isoStringJogo(jogo) {
+  const dt = dataISOJogo(jogo);
+  return dt ? dt.toISOString() : null;
+}
+
+// Regra: o usuário pode editar o palpite até 10 minutos antes do jogo começar
+// e enquanto o jogo não tiver resultado lançado.
+function podeEditarJogo(jogo) {
+  // Jogo já finalizado: não pode mais editar
+  if (jogo.realA !== null && jogo.realA !== undefined) return false;
+
+  const kickoff = dataISOJogo(jogo);
+  if (!kickoff) return true; // sem data definida, libera edição
+
+  const limiteEdicao = kickoff.getTime() - 10 * 60 * 1000; // 10 min antes
+  return Date.now() < limiteEdicao;
+}
+
+// Mantido por compatibilidade: inverso de podeEditarJogo
+function isJogoBloqueado(jogo) {
+  return !podeEditarJogo(jogo);
 }
 
 function extrairRodada(fase) {
@@ -1340,11 +1387,13 @@ function extrairGrupo(fase) {
 }
 
 function parseDataHora(data, hora) {
-  // data: "11/06", hora: "13h" ou "13:00"
+  // data: "11/06", hora: "13h", "20h30" ou "13:00"
   if (!data) return 0;
   const [d, m] = data.split('/').map(Number);
-  const h = parseInt((hora||'0').replace('h',':')) || 0;
-  return (m * 100 + d) * 10000 + h;
+  let h = 0, min = 0;
+  const hm = (hora||'').match(/(\d{1,2})\s*[h:]\s*(\d{1,2})?/i);
+  if (hm) { h = parseInt(hm[1]) || 0; min = parseInt(hm[2]) || 0; }
+  return (m * 100 + d) * 10000 + h * 100 + min;
 }
 
 function formatarData(data) {
@@ -1359,78 +1408,78 @@ function formatarData(data) {
 
 // 72 jogos pré-definidos (usados quando Firebase ainda não tem jogos cadastrados)
 const JOGOS_PADRAO = [
-  {id:'j01',r:'1',grupo:'A',timeA:'México',         timeB:'África do Sul',   data:'11/06',hora:'13h',fase:'Grupo A'},
-  {id:'j02',r:'1',grupo:'A',timeA:'Rep. da Coreia', timeB:'Rep. Tcheca',     data:'11/06',hora:'16h',fase:'Grupo A'},
-  {id:'j03',r:'1',grupo:'B',timeA:'Canadá',         timeB:'Bósnia e Herz.',  data:'12/06',hora:'13h',fase:'Grupo B'},
-  {id:'j04',r:'1',grupo:'D',timeA:'Estados Unidos', timeB:'Paraguai',        data:'12/06',hora:'16h',fase:'Grupo D'},
-  {id:'j05',r:'1',grupo:'B',timeA:'Catar',          timeB:'Suíça',           data:'13/06',hora:'13h',fase:'Grupo B'},
-  {id:'j06',r:'1',grupo:'C',timeA:'Brasil',         timeB:'Marrocos',        data:'13/06',hora:'16h',fase:'Grupo C'},
-  {id:'j07',r:'1',grupo:'C',timeA:'Haiti',          timeB:'Escócia',         data:'13/06',hora:'19h',fase:'Grupo C'},
-  {id:'j08',r:'1',grupo:'D',timeA:'Austrália',      timeB:'Turquia',         data:'13/06',hora:'22h',fase:'Grupo D'},
-  {id:'j09',r:'1',grupo:'E',timeA:'Alemanha',       timeB:'Curaçau',         data:'14/06',hora:'13h',fase:'Grupo E'},
-  {id:'j10',r:'1',grupo:'E',timeA:'Costa do Marfim',timeB:'Equador',         data:'14/06',hora:'16h',fase:'Grupo E'},
-  {id:'j11',r:'1',grupo:'F',timeA:'Holanda',        timeB:'Japão',           data:'14/06',hora:'19h',fase:'Grupo F'},
-  {id:'j12',r:'1',grupo:'F',timeA:'Suécia',         timeB:'Tunísia',         data:'14/06',hora:'22h',fase:'Grupo F'},
+  {id:'j01',r:'1',grupo:'A',timeA:'México',         timeB:'África do Sul',   data:'11/06',hora:'16h',fase:'Grupo A'},
+  {id:'j02',r:'1',grupo:'A',timeA:'Rep. da Coreia', timeB:'Rep. Tcheca',     data:'11/06',hora:'23h',fase:'Grupo A'},
+  {id:'j03',r:'1',grupo:'B',timeA:'Canadá',         timeB:'Bósnia e Herz.',  data:'12/06',hora:'16h',fase:'Grupo B'},
+  {id:'j04',r:'1',grupo:'D',timeA:'Estados Unidos', timeB:'Paraguai',        data:'12/06',hora:'22h',fase:'Grupo D'},
+  {id:'j05',r:'1',grupo:'B',timeA:'Catar',          timeB:'Suíça',           data:'13/06',hora:'16h',fase:'Grupo B'},
+  {id:'j06',r:'1',grupo:'C',timeA:'Brasil',         timeB:'Marrocos',        data:'13/06',hora:'19h',fase:'Grupo C'},
+  {id:'j07',r:'1',grupo:'C',timeA:'Haiti',          timeB:'Escócia',         data:'13/06',hora:'22h',fase:'Grupo C'},
+  {id:'j08',r:'1',grupo:'D',timeA:'Austrália',      timeB:'Turquia',         data:'14/06',hora:'01h',fase:'Grupo D'},
+  {id:'j09',r:'1',grupo:'E',timeA:'Alemanha',       timeB:'Curaçau',         data:'14/06',hora:'14h',fase:'Grupo E'},
+  {id:'j10',r:'1',grupo:'E',timeA:'Costa do Marfim',timeB:'Equador',         data:'14/06',hora:'20h',fase:'Grupo E'},
+  {id:'j11',r:'1',grupo:'F',timeA:'Holanda',        timeB:'Japão',           data:'14/06',hora:'17h',fase:'Grupo F'},
+  {id:'j12',r:'1',grupo:'F',timeA:'Suécia',         timeB:'Tunísia',         data:'14/06',hora:'23h',fase:'Grupo F'},
   {id:'j13',r:'1',grupo:'H',timeA:'Espanha',        timeB:'Cabo Verde',      data:'15/06',hora:'13h',fase:'Grupo H'},
-  {id:'j14',r:'1',grupo:'H',timeA:'Arábia Saudita', timeB:'Uruguai',         data:'15/06',hora:'16h',fase:'Grupo H'},
-  {id:'j15',r:'1',grupo:'G',timeA:'Bélgica',        timeB:'Egito',           data:'15/06',hora:'19h',fase:'Grupo G'},
+  {id:'j14',r:'1',grupo:'H',timeA:'Arábia Saudita', timeB:'Uruguai',         data:'15/06',hora:'19h',fase:'Grupo H'},
+  {id:'j15',r:'1',grupo:'G',timeA:'Bélgica',        timeB:'Egito',           data:'15/06',hora:'16h',fase:'Grupo G'},
   {id:'j16',r:'1',grupo:'G',timeA:'Irã',            timeB:'Nova Zelândia',   data:'15/06',hora:'22h',fase:'Grupo G'},
-  {id:'j17',r:'1',grupo:'J',timeA:'Áustria',        timeB:'Jordânia',        data:'16/06',hora:'13h',fase:'Grupo J'},
+  {id:'j17',r:'1',grupo:'J',timeA:'Áustria',        timeB:'Jordânia',        data:'17/06',hora:'01h',fase:'Grupo J'},
   {id:'j18',r:'1',grupo:'I',timeA:'França',         timeB:'Senegal',         data:'16/06',hora:'16h',fase:'Grupo I'},
   {id:'j19',r:'1',grupo:'I',timeA:'Iraque',         timeB:'Noruega',         data:'16/06',hora:'19h',fase:'Grupo I'},
   {id:'j20',r:'1',grupo:'J',timeA:'Argentina',      timeB:'Argélia',         data:'16/06',hora:'22h',fase:'Grupo J'},
-  {id:'j21',r:'1',grupo:'K',timeA:'Portugal',       timeB:'Rep. Dem. Congo', data:'17/06',hora:'13h',fase:'Grupo K'},
-  {id:'j22',r:'1',grupo:'L',timeA:'Inglaterra',     timeB:'Croácia',         data:'17/06',hora:'16h',fase:'Grupo L'},
-  {id:'j23',r:'1',grupo:'L',timeA:'Gana',           timeB:'Panamá',          data:'17/06',hora:'19h',fase:'Grupo L'},
-  {id:'j24',r:'1',grupo:'K',timeA:'Uzbequistão',    timeB:'Colômbia',        data:'17/06',hora:'22h',fase:'Grupo K'},
+  {id:'j21',r:'1',grupo:'K',timeA:'Portugal',       timeB:'Rep. Dem. Congo', data:'17/06',hora:'14h',fase:'Grupo K'},
+  {id:'j22',r:'1',grupo:'L',timeA:'Inglaterra',     timeB:'Croácia',         data:'17/06',hora:'17h',fase:'Grupo L'},
+  {id:'j23',r:'1',grupo:'L',timeA:'Gana',           timeB:'Panamá',          data:'17/06',hora:'20h',fase:'Grupo L'},
+  {id:'j24',r:'1',grupo:'K',timeA:'Uzbequistão',    timeB:'Colômbia',        data:'17/06',hora:'23h',fase:'Grupo K'},
   {id:'j25',r:'2',grupo:'A',timeA:'Rep. Tcheca',    timeB:'África do Sul',   data:'18/06',hora:'13h',fase:'Grupo A'},
   {id:'j26',r:'2',grupo:'B',timeA:'Suíça',          timeB:'Bósnia e Herz.',  data:'18/06',hora:'16h',fase:'Grupo B'},
   {id:'j27',r:'2',grupo:'B',timeA:'Canadá',         timeB:'Catar',           data:'18/06',hora:'19h',fase:'Grupo B'},
   {id:'j28',r:'2',grupo:'A',timeA:'México',         timeB:'Rep. da Coreia',  data:'18/06',hora:'22h',fase:'Grupo A'},
-  {id:'j29',r:'2',grupo:'D',timeA:'Turquia',        timeB:'Paraguai',        data:'19/06',hora:'13h',fase:'Grupo D'},
+  {id:'j29',r:'2',grupo:'D',timeA:'Turquia',        timeB:'Paraguai',        data:'20/06',hora:'00h',fase:'Grupo D'},
   {id:'j30',r:'2',grupo:'D',timeA:'Estados Unidos', timeB:'Austrália',       data:'19/06',hora:'16h',fase:'Grupo D'},
   {id:'j31',r:'2',grupo:'C',timeA:'Escócia',        timeB:'Marrocos',        data:'19/06',hora:'19h',fase:'Grupo C'},
-  {id:'j32',r:'2',grupo:'C',timeA:'Brasil',         timeB:'Haiti',           data:'19/06',hora:'22h',fase:'Grupo C'},
-  {id:'j33',r:'2',grupo:'F',timeA:'Tunísia',        timeB:'Japão',           data:'20/06',hora:'13h',fase:'Grupo F'},
-  {id:'j34',r:'2',grupo:'F',timeA:'Holanda',        timeB:'Suécia',          data:'20/06',hora:'16h',fase:'Grupo F'},
-  {id:'j35',r:'2',grupo:'E',timeA:'Alemanha',       timeB:'Costa do Marfim', data:'20/06',hora:'19h',fase:'Grupo E'},
-  {id:'j36',r:'2',grupo:'E',timeA:'Equador',        timeB:'Curaçau',         data:'20/06',hora:'22h',fase:'Grupo E'},
+  {id:'j32',r:'2',grupo:'C',timeA:'Brasil',         timeB:'Haiti',           data:'19/06',hora:'21h30',fase:'Grupo C'},
+  {id:'j33',r:'2',grupo:'F',timeA:'Tunísia',        timeB:'Japão',           data:'21/06',hora:'01h',fase:'Grupo F'},
+  {id:'j34',r:'2',grupo:'F',timeA:'Holanda',        timeB:'Suécia',          data:'20/06',hora:'14h',fase:'Grupo F'},
+  {id:'j35',r:'2',grupo:'E',timeA:'Alemanha',       timeB:'Costa do Marfim', data:'20/06',hora:'17h',fase:'Grupo E'},
+  {id:'j36',r:'2',grupo:'E',timeA:'Equador',        timeB:'Curaçau',         data:'20/06',hora:'21h',fase:'Grupo E'},
   {id:'j37',r:'2',grupo:'H',timeA:'Espanha',        timeB:'Arábia Saudita',  data:'21/06',hora:'13h',fase:'Grupo H'},
   {id:'j38',r:'2',grupo:'G',timeA:'Bélgica',        timeB:'Irã',             data:'21/06',hora:'16h',fase:'Grupo G'},
   {id:'j39',r:'2',grupo:'H',timeA:'Uruguai',        timeB:'Cabo Verde',      data:'21/06',hora:'19h',fase:'Grupo H'},
   {id:'j40',r:'2',grupo:'G',timeA:'Nova Zelândia',  timeB:'Egito',           data:'21/06',hora:'22h',fase:'Grupo G'},
-  {id:'j41',r:'2',grupo:'J',timeA:'Argentina',      timeB:'Áustria',         data:'22/06',hora:'13h',fase:'Grupo J'},
-  {id:'j42',r:'2',grupo:'I',timeA:'França',         timeB:'Iraque',          data:'22/06',hora:'16h',fase:'Grupo I'},
-  {id:'j43',r:'2',grupo:'I',timeA:'Noruega',        timeB:'Senegal',         data:'22/06',hora:'19h',fase:'Grupo I'},
-  {id:'j44',r:'2',grupo:'J',timeA:'Jordânia',       timeB:'Argélia',         data:'22/06',hora:'22h',fase:'Grupo J'},
-  {id:'j45',r:'2',grupo:'K',timeA:'Portugal',       timeB:'Uzbequistão',     data:'23/06',hora:'13h',fase:'Grupo K'},
-  {id:'j46',r:'2',grupo:'L',timeA:'Inglaterra',     timeB:'Gana',            data:'23/06',hora:'16h',fase:'Grupo L'},
-  {id:'j47',r:'2',grupo:'L',timeA:'Panamá',         timeB:'Croácia',         data:'23/06',hora:'19h',fase:'Grupo L'},
-  {id:'j48',r:'2',grupo:'K',timeA:'Colômbia',       timeB:'Rep. Dem. Congo', data:'23/06',hora:'22h',fase:'Grupo K'},
+  {id:'j41',r:'2',grupo:'J',timeA:'Argentina',      timeB:'Áustria',         data:'22/06',hora:'14h',fase:'Grupo J'},
+  {id:'j42',r:'2',grupo:'I',timeA:'França',         timeB:'Iraque',          data:'22/06',hora:'18h',fase:'Grupo I'},
+  {id:'j43',r:'2',grupo:'I',timeA:'Noruega',        timeB:'Senegal',         data:'22/06',hora:'21h',fase:'Grupo I'},
+  {id:'j44',r:'2',grupo:'J',timeA:'Jordânia',       timeB:'Argélia',         data:'23/06',hora:'00h',fase:'Grupo J'},
+  {id:'j45',r:'2',grupo:'K',timeA:'Portugal',       timeB:'Uzbequistão',     data:'23/06',hora:'14h',fase:'Grupo K'},
+  {id:'j46',r:'2',grupo:'L',timeA:'Inglaterra',     timeB:'Gana',            data:'23/06',hora:'17h',fase:'Grupo L'},
+  {id:'j47',r:'2',grupo:'L',timeA:'Panamá',         timeB:'Croácia',         data:'23/06',hora:'20h',fase:'Grupo L'},
+  {id:'j48',r:'2',grupo:'K',timeA:'Colômbia',       timeB:'Rep. Dem. Congo', data:'23/06',hora:'23h',fase:'Grupo K'},
   {id:'j49',r:'3',grupo:'B',timeA:'Suíça',          timeB:'Canadá',          data:'24/06',hora:'16h',fase:'Grupo B'},
   {id:'j50',r:'3',grupo:'B',timeA:'Bósnia e Herz.', timeB:'Catar',           data:'24/06',hora:'16h',fase:'Grupo B'},
-  {id:'j51',r:'3',grupo:'C',timeA:'Escócia',        timeB:'Brasil',          data:'24/06',hora:'20h',fase:'Grupo C'},
-  {id:'j52',r:'3',grupo:'C',timeA:'Marrocos',       timeB:'Haiti',           data:'24/06',hora:'20h',fase:'Grupo C'},
+  {id:'j51',r:'3',grupo:'C',timeA:'Escócia',        timeB:'Brasil',          data:'24/06',hora:'19h',fase:'Grupo C'},
+  {id:'j52',r:'3',grupo:'C',timeA:'Marrocos',       timeB:'Haiti',           data:'24/06',hora:'19h',fase:'Grupo C'},
   {id:'j53',r:'3',grupo:'A',timeA:'Rep. Tcheca',    timeB:'México',          data:'24/06',hora:'22h',fase:'Grupo A'},
   {id:'j54',r:'3',grupo:'A',timeA:'África do Sul',  timeB:'Rep. da Coreia',  data:'24/06',hora:'22h',fase:'Grupo A'},
-  {id:'j55',r:'3',grupo:'E',timeA:'Equador',        timeB:'Alemanha',        data:'25/06',hora:'16h',fase:'Grupo E'},
-  {id:'j56',r:'3',grupo:'E',timeA:'Curaçau',        timeB:'Costa do Marfim', data:'25/06',hora:'16h',fase:'Grupo E'},
+  {id:'j55',r:'3',grupo:'E',timeA:'Equador',        timeB:'Alemanha',        data:'25/06',hora:'17h',fase:'Grupo E'},
+  {id:'j56',r:'3',grupo:'E',timeA:'Curaçau',        timeB:'Costa do Marfim', data:'25/06',hora:'17h',fase:'Grupo E'},
   {id:'j57',r:'3',grupo:'F',timeA:'Japão',          timeB:'Suécia',          data:'25/06',hora:'20h',fase:'Grupo F'},
   {id:'j58',r:'3',grupo:'F',timeA:'Tunísia',        timeB:'Holanda',         data:'25/06',hora:'20h',fase:'Grupo F'},
-  {id:'j59',r:'3',grupo:'D',timeA:'Turquia',        timeB:'Estados Unidos',  data:'25/06',hora:'22h',fase:'Grupo D'},
-  {id:'j60',r:'3',grupo:'D',timeA:'Paraguai',       timeB:'Austrália',       data:'25/06',hora:'22h',fase:'Grupo D'},
+  {id:'j59',r:'3',grupo:'D',timeA:'Turquia',        timeB:'Estados Unidos',  data:'25/06',hora:'23h',fase:'Grupo D'},
+  {id:'j60',r:'3',grupo:'D',timeA:'Paraguai',       timeB:'Austrália',       data:'25/06',hora:'23h',fase:'Grupo D'},
   {id:'j61',r:'3',grupo:'I',timeA:'Noruega',        timeB:'França',          data:'26/06',hora:'16h',fase:'Grupo I'},
   {id:'j62',r:'3',grupo:'I',timeA:'Senegal',        timeB:'Iraque',          data:'26/06',hora:'16h',fase:'Grupo I'},
-  {id:'j63',r:'3',grupo:'H',timeA:'Cabo Verde',     timeB:'Arábia Saudita',  data:'26/06',hora:'20h',fase:'Grupo H'},
-  {id:'j64',r:'3',grupo:'H',timeA:'Uruguai',        timeB:'Espanha',         data:'26/06',hora:'20h',fase:'Grupo H'},
-  {id:'j65',r:'3',grupo:'G',timeA:'Egito',          timeB:'Irã',             data:'26/06',hora:'22h',fase:'Grupo G'},
-  {id:'j66',r:'3',grupo:'G',timeA:'Nova Zelândia',  timeB:'Bélgica',         data:'26/06',hora:'22h',fase:'Grupo G'},
-  {id:'j67',r:'3',grupo:'L',timeA:'Panamá',         timeB:'Inglaterra',      data:'27/06',hora:'16h',fase:'Grupo L'},
-  {id:'j68',r:'3',grupo:'L',timeA:'Croácia',        timeB:'Gana',            data:'27/06',hora:'16h',fase:'Grupo L'},
-  {id:'j69',r:'3',grupo:'K',timeA:'Colômbia',       timeB:'Portugal',        data:'27/06',hora:'20h',fase:'Grupo K'},
-  {id:'j70',r:'3',grupo:'K',timeA:'Rep. Dem. Congo',timeB:'Uzbequistão',     data:'27/06',hora:'20h',fase:'Grupo K'},
-  {id:'j71',r:'3',grupo:'J',timeA:'Argélia',        timeB:'Áustria',         data:'27/06',hora:'22h',fase:'Grupo J'},
-  {id:'j72',r:'3',grupo:'J',timeA:'Jordânia',       timeB:'Argentina',       data:'27/06',hora:'22h',fase:'Grupo J'},
+  {id:'j63',r:'3',grupo:'H',timeA:'Cabo Verde',     timeB:'Arábia Saudita',  data:'26/06',hora:'21h',fase:'Grupo H'},
+  {id:'j64',r:'3',grupo:'H',timeA:'Uruguai',        timeB:'Espanha',         data:'26/06',hora:'21h',fase:'Grupo H'},
+  {id:'j65',r:'3',grupo:'G',timeA:'Egito',          timeB:'Irã',             data:'27/06',hora:'00h',fase:'Grupo G'},
+  {id:'j66',r:'3',grupo:'G',timeA:'Nova Zelândia',  timeB:'Bélgica',         data:'27/06',hora:'00h',fase:'Grupo G'},
+  {id:'j67',r:'3',grupo:'L',timeA:'Panamá',         timeB:'Inglaterra',      data:'27/06',hora:'18h',fase:'Grupo L'},
+  {id:'j68',r:'3',grupo:'L',timeA:'Croácia',        timeB:'Gana',            data:'27/06',hora:'18h',fase:'Grupo L'},
+  {id:'j69',r:'3',grupo:'K',timeA:'Colômbia',       timeB:'Portugal',        data:'27/06',hora:'20h30',fase:'Grupo K'},
+  {id:'j70',r:'3',grupo:'K',timeA:'Rep. Dem. Congo',timeB:'Uzbequistão',     data:'27/06',hora:'20h30',fase:'Grupo K'},
+  {id:'j71',r:'3',grupo:'J',timeA:'Argélia',        timeB:'Áustria',         data:'27/06',hora:'23h',fase:'Grupo J'},
+  {id:'j72',r:'3',grupo:'J',timeA:'Jordânia',       timeB:'Argentina',       data:'27/06',hora:'23h',fase:'Grupo J'},
 ];
 
 function temPalpiteCount(pid) {
@@ -1438,6 +1487,43 @@ function temPalpiteCount(pid) {
     const pal = (state.palpites[j.id]||{})[pid]||{};
     return pal.a!==undefined&&pal.a!=='';
   }).length;
+}
+
+// ══════════════════════════════════════════
+// PALPITES DOS OUTROS PARTICIPANTES (somente leitura)
+// ══════════════════════════════════════════
+function renderOutrosPalpites(jogo, myPid) {
+  if (!state.participantes.length) return '';
+
+  const fin = jogo.realA !== null && jogo.realA !== undefined;
+
+  const lista = state.participantes.map(part => {
+    const pal = (state.palpites[jogo.id]||{})[part.id] || {};
+    if (pal.a === undefined || pal.a === '') return null; // só mostra quem já salvou
+    const isMe = part.id === myPid;
+    let extra = '';
+    if (fin) {
+      const pts = calcPontos(jogo, pal);
+      let cls = '';
+      if (pts===5) cls='acerto-5'; else if(pts===3) cls='acerto-3'; else if(pts===2) cls='acerto-2';
+      extra = ` <span class="${cls}" style="font-size:.68rem;">${pts} pts</span>`;
+    }
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.8rem;">
+        <span style="${isMe?'color:var(--gold-light);font-weight:700;':''}">${part.nome}${isMe?' <span class="meu-tag">você</span>':''}</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1px;">${pal.a}–${pal.b}${extra}</span>
+      </div>`;
+  }).filter(Boolean);
+
+  if (!lista.length) {
+    return `<div style="margin-top:8px;font-size:.72rem;color:var(--text-dim);text-align:center;">Nenhum palpite enviado ainda.</div>`;
+  }
+
+  return `
+    <details class="pal-outros">
+      <summary>👥 Ver palpites (${lista.length}/${state.participantes.length})</summary>
+      <div style="margin-top:6px;">${lista.join('')}</div>
+    </details>`;
 }
 
 // ══════════════════════════════════════════
@@ -1643,41 +1729,46 @@ async function seedJogos2026() {
 }
 
 // ══════════════════════════════════════════
-// CORRIGIR HORÁRIOS DE JOGOS JÁ CADASTRADOS
-// (jogos antigos no Firebase não tinham campo "hora")
+// ATUALIZAR HORÁRIOS/DATAS COM TABELA OFICIAL FIFA
+// (corrige jogos já cadastrados no Firebase, mesmo
+//  que já tenham um horário diferente)
 // ══════════════════════════════════════════
 async function fixHorarios() {
   if (session.role !== 'admin') return;
 
-  // Mapa de horários por times+data (vindo da lista oficial JOGOS_PADRAO)
+  // Mapa de data+horário oficiais por par de times (vindo de JOGOS_PADRAO)
   const mapa = {};
   JOGOS_PADRAO.forEach(j => {
-    const key = `${normTxt(j.timeA)}|${normTxt(j.timeB)}|${j.data}`;
-    mapa[key] = j.hora;
+    const key = `${normTxt(j.timeA)}|${normTxt(j.timeB)}`;
+    mapa[key] = { data: j.data, hora: j.hora };
   });
 
   const updates = {};
-  let corrigidos = 0, semHora = 0;
+  let corrigidos = 0, semCorrespondencia = 0;
 
   state.jogos.forEach(j => {
-    if (j.hora) return; // já tem horário, não toca
-    const key = `${normTxt(j.timeA)}|${normTxt(j.timeB)}|${j.data}`;
-    const hora = mapa[key];
-    if (hora) {
-      updates[`jogos/${j.id}/hora`] = hora;
+    const key = `${normTxt(j.timeA)}|${normTxt(j.timeB)}`;
+    const oficial = mapa[key];
+    if (!oficial) { semCorrespondencia++; return; }
+
+    const mudouHora = j.hora !== oficial.hora;
+    const mudouData = j.data !== oficial.data;
+    if (mudouHora || mudouData) {
+      if (mudouHora) updates[`jogos/${j.id}/hora`] = oficial.hora;
+      if (mudouData) updates[`jogos/${j.id}/data`] = oficial.data;
       corrigidos++;
-    } else {
-      semHora++;
     }
   });
 
   if (!corrigidos) {
-    toast(semHora ? `⚠️ ${semHora} jogo(s) sem correspondência. Verifique nomes/datas.` : '✅ Todos os jogos já têm horário!');
+    toast(semCorrespondencia
+      ? `⚠️ ${semCorrespondencia} jogo(s) sem correspondência. Verifique nomes/datas.`
+      : '✅ Todos os horários já estão atualizados!');
     return;
   }
 
   await fbUpdate('', updates);
-  toast(`✅ ${corrigidos} jogo(s) corrigido(s) com horário!${semHora ? ` (${semHora} sem correspondência)` : ''}`);
+  toast(`✅ ${corrigidos} jogo(s) atualizado(s) com data/horário oficiais!${semCorrespondencia ? ` (${semCorrespondencia} sem correspondência)` : ''}`);
 }
 window.fixHorarios = fixHorarios;
 
@@ -1687,9 +1778,17 @@ function normTxt(s) {
     .replace(/ó|ô|õ/g,'o').replace(/ú/g,'u').replace(/ç/g,'c');
 }
 
-// Conta quantos jogos faltam horário (para exibir aviso no admin)
+// Conta quantos jogos estão desatualizados em relação à tabela oficial
 function countJogosSemHora() {
-  return state.jogos.filter(j => !j.hora).length;
+  const mapa = {};
+  JOGOS_PADRAO.forEach(j => {
+    mapa[`${normTxt(j.timeA)}|${normTxt(j.timeB)}`] = { data: j.data, hora: j.hora };
+  });
+  return state.jogos.filter(j => {
+    const oficial = mapa[`${normTxt(j.timeA)}|${normTxt(j.timeB)}`];
+    if (!oficial) return !j.hora; // sem correspondência: considera "sem horário" só se vazio
+    return !j.hora || j.hora !== oficial.hora || j.data !== oficial.data;
+  }).length;
 }
 
 // ══════════════════════════════════════════
