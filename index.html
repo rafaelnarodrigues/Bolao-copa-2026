@@ -218,6 +218,30 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .pal-resultado{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold-light);text-align:center;letter-spacing:2px}
 .pal-pts-badge{font-size:.72rem;text-align:center;margin-top:6px}
 .pal-outros{margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
+
+/* TABELA DE GRUPOS */
+.grupo-card{margin-bottom:14px}
+.grupo-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--bg3);border-bottom:1px solid var(--border)}
+.grupo-hdr h3{font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:2px;color:var(--gold-light)}
+.grupo-hdr .grupo-prog{font-size:.7rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif}
+.gtbl{width:100%;border-collapse:collapse;font-size:.78rem}
+.gtbl th{padding:7px 4px;font-family:'Barlow Condensed',sans-serif;font-size:.62rem;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim);text-align:center;border-bottom:1px solid var(--border)}
+.gtbl th:first-child,.gtbl td:first-child{text-align:left;padding-left:12px;width:38%}
+.gtbl td{padding:8px 4px;text-align:center;border-bottom:1px solid rgba(255,255,255,.04)}
+.gtbl tr:last-child td{border-bottom:none}
+.gtbl .gtime{font-family:'Barlow Condensed',sans-serif;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gtbl .gpos{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.85rem;flex-shrink:0}
+.gpos-1{background:rgba(0,210,106,.22);color:var(--green-light)}
+.gpos-2{background:rgba(255,223,0,.18);color:var(--gold-light)}
+.gpos-other{background:var(--bg4);color:var(--text-dim)}
+.gtbl .gpts{font-family:'Bebas Neue',sans-serif;font-size:.95rem;color:var(--gold-light)}
+.gtbl .gsaldo-pos{color:var(--green-light)}
+.gtbl .gsaldo-neg{color:#ff8a8a}
+.grupo-classif-row td{border-top:2px solid var(--green-light)}
+.grupos-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:4px;-webkit-overflow-scrolling:touch}
+.grupos-tabs::-webkit-scrollbar{display:none}
+.grupo-tab-btn{flex-shrink:0;background:var(--bg3);border:1px solid var(--border);color:var(--text-dim);border-radius:100px;padding:7px 16px;font-family:'Bebas Neue',sans-serif;font-size:.9rem;letter-spacing:1px;cursor:pointer}
+.grupo-tab-btn.active{background:var(--green);color:#fff;border-color:var(--green)}
 .pal-outros summary{cursor:pointer;font-size:.75rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;list-style:none;display:flex;align-items:center;gap:4px;-webkit-tap-highlight-color:transparent}
 .pal-outros summary::-webkit-details-marker{display:none}
 .pal-outros summary::after{content:'▾';margin-left:auto;font-size:.7rem;transition:transform .2s}
@@ -411,6 +435,15 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
 </div>
 
+<!-- TABELA DE GRUPOS -->
+<div id="tab-grupos" class="section">
+  <div class="sec-title">Tabela de Grupos</div>
+  <div style="background:linear-gradient(135deg,rgba(0,156,59,.2),rgba(0,39,118,.2));border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;">
+    <div style="font-size:.82rem;color:var(--text-dim);line-height:1.6;">📊 Classificação calculada automaticamente com base nos resultados lançados no app. Critérios de desempate: <strong style="color:var(--text);">pontos → saldo de gols → gols pró → confronto direto</strong>.</div>
+  </div>
+  <div id="grupos-content"></div>
+</div>
+
 <!-- REGRAS -->
 <div id="tab-regras" class="section">
   <div class="sec-title">Regras</div>
@@ -504,6 +537,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <button class="nav-btn admin-only" id="nav-jogos" onclick="showTab('jogos',this)" style="display:none"><span class="nav-icon">🏟</span>Jogos</button>
   <button class="nav-btn admin-only" id="nav-participantes" onclick="showTab('participantes',this)" style="display:none"><span class="nav-icon">👥</span>Pessoas</button>
   <button class="nav-btn" onclick="showTab('ranking',this)"><span class="nav-icon">🏆</span>Ranking</button>
+  <button class="nav-btn" onclick="showTab('grupos',this)"><span class="nav-icon">📋</span>Grupos</button>
   <button class="nav-btn" onclick="showTab('regras',this)"><span class="nav-icon">📖</span>Regras</button>
 </nav>
 
@@ -1977,6 +2011,166 @@ async function sha256(str){
 }
 
 // ══════════════════════════════════════════
+// TABELA DE GRUPOS — calculada a partir dos resultados
+// ══════════════════════════════════════════
+
+// Bandeiras (mesmo mapa usado em outras partes, reduzido aos times do app)
+const FLAGS_GRUPOS = {
+  'México':'🇲🇽','África do Sul':'🇿🇦','Rep. da Coreia':'🇰🇷','Rep. Tcheca':'🇨🇿',
+  'Canadá':'🇨🇦','Bósnia e Herz.':'🇧🇦','Catar':'🇶🇦','Suíça':'🇨🇭',
+  'Brasil':'🇧🇷','Marrocos':'🇲🇦','Haiti':'🇭🇹','Escócia':'🏴',
+  'Estados Unidos':'🇺🇸','Paraguai':'🇵🇾','Austrália':'🇦🇺','Turquia':'🇹🇷',
+  'Alemanha':'🇩🇪','Curaçau':'🇨🇼','Costa do Marfim':'🇨🇮','Equador':'🇪🇨',
+  'Holanda':'🇳🇱','Japão':'🇯🇵','Suécia':'🇸🇪','Tunísia':'🇹🇳',
+  'Bélgica':'🇧🇪','Egito':'🇪🇬','Irã':'🇮🇷','Nova Zelândia':'🇳🇿',
+  'Espanha':'🇪🇸','Cabo Verde':'🇨🇻','Arábia Saudita':'🇸🇦','Uruguai':'🇺🇾',
+  'França':'🇫🇷','Senegal':'🇸🇳','Noruega':'🇳🇴','Iraque':'🇮🇶',
+  'Argentina':'🇦🇷','Argélia':'🇩🇿','Áustria':'🇦🇹','Jordânia':'🇯🇴',
+  'Portugal':'🇵🇹','Uzbequistão':'🇺🇿','Colômbia':'🇨🇴','Rep. Dem. Congo':'🇨🇩',
+  'Inglaterra':'🏴','Croácia':'🇭🇷','Gana':'🇬🇭','Panamá':'🇵🇦',
+};
+
+function calcClassificacaoGrupos() {
+  const jogosBase = state.jogos.length ? state.jogos : JOGOS_PADRAO;
+
+  // Agrupa jogos por grupo
+  const porGrupo = {};
+  jogosBase.forEach(j => {
+    const g = j.grupo || extrairGrupo(j.fase) || '?';
+    (porGrupo[g] = porGrupo[g] || []).push(j);
+  });
+
+  const resultado = {};
+  Object.keys(porGrupo).sort().forEach(g => {
+    const jogos = porGrupo[g];
+
+    // Inicializa estatísticas de cada time do grupo
+    const times = {};
+    jogos.forEach(j => {
+      [j.timeA, j.timeB].forEach(t => {
+        if (!times[t]) times[t] = { nome:t, pts:0, j:0, v:0, e:0, d:0, gp:0, gc:0, sg:0 };
+      });
+    });
+
+    // Confrontos diretos (para desempate): "TimeA|TimeB" -> resultado
+    const confrontos = {};
+
+    jogos.forEach(j => {
+      if (j.realA === null || j.realA === undefined || j.realB === null || j.realB === undefined) return;
+      const A = times[j.timeA], B = times[j.timeB];
+      const ga = j.realA, gb = j.realB;
+
+      A.j++; B.j++;
+      A.gp += ga; A.gc += gb;
+      B.gp += gb; B.gc += ga;
+
+      if (ga > gb) { A.v++; A.pts+=3; B.d++; }
+      else if (ga < gb) { B.v++; B.pts+=3; A.d++; }
+      else { A.e++; B.e++; A.pts+=1; B.pts+=1; }
+
+      A.sg = A.gp - A.gc;
+      B.sg = B.gp - B.gc;
+
+      confrontos[`${j.timeA}|${j.timeB}`] = { golsA: ga, golsB: gb };
+      confrontos[`${j.timeB}|${j.timeA}`] = { golsA: gb, golsB: ga };
+    });
+
+    // Ordena: pts -> saldo -> gols pró -> confronto direto (heurística simplificada) -> alfabética
+    const lista = Object.values(times).sort((a,b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.sg !== a.sg) return b.sg - a.sg;
+      if (b.gp !== a.gp) return b.gp - a.gp;
+      // Confronto direto entre a e b
+      const cd = confrontos[`${a.nome}|${b.nome}`];
+      if (cd) {
+        const diffA = cd.golsA - cd.golsB;
+        if (diffA !== 0) return -diffA; // se A venceu o confronto direto, A vem primeiro
+      }
+      return a.nome.localeCompare(b.nome);
+    });
+
+    const totalJogos = jogos.length;
+    const jogosFinalizados = jogos.filter(j => j.realA !== null && j.realA !== undefined).length;
+
+    resultado[g] = { lista, totalJogos, jogosFinalizados };
+  });
+
+  return resultado;
+}
+
+let grupoSelecionado = null;
+
+function renderGrupos() {
+  const c = document.getElementById('grupos-content');
+  if (!c) return;
+
+  const classif = calcClassificacaoGrupos();
+  const gruposOrdenados = Object.keys(classif).sort();
+
+  if (!gruposOrdenados.length) {
+    c.innerHTML = '<div class="empty"><div class="eico">📋</div><p>Nenhum jogo cadastrado ainda.</p></div>';
+    return;
+  }
+
+  if (!grupoSelecionado || !classif[grupoSelecionado]) grupoSelecionado = gruposOrdenados[0];
+
+  // Tabs de seleção de grupo
+  const tabs = gruposOrdenados.map(g => {
+    return `<button class="grupo-tab-btn ${g===grupoSelecionado?'active':''}" onclick="selecionarGrupo('${g}')">Grupo ${g}</button>`;
+  }).join('');
+
+  // Renderiza só o grupo selecionado (mobile-first, evita 12 tabelas grandes na tela)
+  const g = grupoSelecionado;
+  const dados = classif[g];
+
+  const linhas = dados.lista.map((t, idx) => {
+    const pos = idx + 1;
+    const posCls = pos === 1 ? 'gpos-1' : pos === 2 ? 'gpos-2' : 'gpos-other';
+    const sgCls = t.sg > 0 ? 'gsaldo-pos' : t.sg < 0 ? 'gsaldo-neg' : '';
+    const sgStr = t.sg > 0 ? `+${t.sg}` : `${t.sg}`;
+    const flag = FLAGS_GRUPOS[t.nome] || '🏳️';
+    return `
+      <tr>
+        <td><div class="gtime"><span class="gpos ${posCls}">${pos}</span><span>${flag}</span><span>${t.nome}</span></div></td>
+        <td class="gpts">${t.pts}</td>
+        <td>${t.j}</td>
+        <td>${t.v}</td>
+        <td>${t.e}</td>
+        <td>${t.d}</td>
+        <td>${t.gp}</td>
+        <td>${t.gc}</td>
+        <td class="${sgCls}">${sgStr}</td>
+      </tr>`;
+  }).join('');
+
+  c.innerHTML = `
+    <div class="grupos-tabs">${tabs}</div>
+    <div class="card grupo-card">
+      <div class="grupo-hdr">
+        <h3>Grupo ${g}</h3>
+        <span class="grupo-prog">${dados.jogosFinalizados}/${dados.totalJogos} jogos</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="gtbl">
+          <thead><tr>
+            <th>Time</th><th>Pts</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th>
+          </tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>
+      ${dados.jogosFinalizados < dados.totalJogos ? `<div style="padding:10px 14px;font-size:.72rem;color:var(--text-dim);border-top:1px solid var(--border);">⏳ Classificação parcial — ${dados.totalJogos - dados.jogosFinalizados} jogo(s) restante(s) neste grupo.</div>` : `<div style="padding:10px 14px;font-size:.72rem;color:var(--green-light);border-top:1px solid var(--border);">✅ Grupo encerrado — classificação final.</div>`}
+    </div>
+    <div style="font-size:.7rem;color:var(--text-dim);text-align:center;margin-top:4px;">🟢 1º e 2º lugares avançam para as oitavas de final</div>
+  `;
+}
+
+function selecionarGrupo(g) {
+  grupoSelecionado = g;
+  renderGrupos();
+}
+window.selecionarGrupo = selecionarGrupo;
+
+// ══════════════════════════════════════════
 // REFRESH
 // ══════════════════════════════════════════
 function refresh(){
@@ -1985,6 +2179,7 @@ function refresh(){
   renderPalpites();
   renderRanking();
   renderDashboard();
+  renderGrupos();
 }
 
 // ══════════════════════════════════════════
