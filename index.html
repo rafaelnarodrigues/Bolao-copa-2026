@@ -238,6 +238,26 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .gtbl .gsaldo-pos{color:var(--green-light)}
 .gtbl .gsaldo-neg{color:#ff8a8a}
 .grupo-classif-row td{border-top:2px solid var(--green-light)}
+.status-row td{padding:4px 12px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.04)}
+.status-row:last-child td{border-bottom:none}
+.status-badge{display:inline-block;font-size:.66rem;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;padding:2px 8px;border-radius:100px}
+.status-classif{background:rgba(0,210,106,.15);color:var(--green-light)}
+.status-elim{background:rgba(230,57,70,.12);color:#ff8a8a}
+.status-disputa{background:rgba(255,223,0,.12);color:var(--gold-light)}
+
+/* BRACKET MATA-MATA */
+.bracket-fase{margin-bottom:18px}
+.bracket-fase-hdr{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--gold-light);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.bracket-fase-hdr .bcount{font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;font-weight:400}
+.bracket-jogo{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.bracket-jogo.bfinal{border-color:var(--gold);background:linear-gradient(135deg,rgba(255,223,0,.08),var(--bg3))}
+.bracket-row{display:flex;align-items:center;justify-content:space-between;padding:3px 0}
+.bracket-team{font-family:'Barlow Condensed',sans-serif;font-size:.88rem;display:flex;align-items:center;gap:6px}
+.bracket-team.bwinner{color:var(--green-light);font-weight:700}
+.bracket-score{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--gold-light);min-width:24px;text-align:center}
+.bracket-vs{font-size:.65rem;color:var(--text-dim);text-align:center;margin:2px 0}
+.bracket-meta{font-size:.66rem;color:var(--text-dim);margin-top:6px;font-family:'Barlow Condensed',sans-serif}
+.bracket-tbd{color:var(--text-dim);font-style:italic;font-size:.85rem}
 .grupos-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:4px;-webkit-overflow-scrolling:touch}
 .grupos-tabs::-webkit-scrollbar{display:none}
 .grupo-tab-btn{flex-shrink:0;background:var(--bg3);border:1px solid var(--border);color:var(--text-dim);border-radius:100px;padding:7px 16px;font-family:'Bebas Neue',sans-serif;font-size:.9rem;letter-spacing:1px;cursor:pointer}
@@ -437,12 +457,30 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 <!-- TABELA DE GRUPOS -->
 <div id="tab-grupos" class="section">
-  <div class="sec-title">Copa do Mundo — Tabela de Grupos</div>
-  <div style="background:linear-gradient(135deg,rgba(0,156,59,.2),rgba(0,39,118,.2));border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;">
-    <div style="font-size:.82rem;color:var(--text-dim);line-height:1.6;">📊 Classificação calculada automaticamente com base nos resultados lançados no app. Critérios de desempate: <strong style="color:var(--text);">pontos → saldo de gols → gols pró → confronto direto</strong>.</div>
+  <div class="sec-title">Copa do Mundo</div>
+
+  <div class="grupos-tabs" style="margin-bottom:14px;">
+    <button class="grupo-tab-btn" id="subtab-grupos-btn" onclick="showCopaSubtab('grupos')">📋 Grupos</button>
+    <button class="grupo-tab-btn" id="subtab-mata-btn" onclick="showCopaSubtab('mata')">🏆 Mata-Mata</button>
   </div>
-  <div id="grupos-content"></div>
+
+  <!-- SUB-ABA: GRUPOS -->
+  <div id="copa-sub-grupos">
+    <div style="background:linear-gradient(135deg,rgba(0,156,59,.2),rgba(0,39,118,.2));border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:.82rem;color:var(--text-dim);line-height:1.6;">📊 Classificação calculada automaticamente com base nos resultados lançados no app. Critérios de desempate: <strong style="color:var(--text);">pontos → saldo de gols → gols pró → confronto direto</strong>.</div>
+    </div>
+    <div id="grupos-content"></div>
+  </div>
+
+  <!-- SUB-ABA: MATA-MATA -->
+  <div id="copa-sub-mata" style="display:none;">
+    <div style="background:linear-gradient(135deg,rgba(255,223,0,.12),rgba(0,39,118,.2));border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:.82rem;color:var(--text-dim);line-height:1.6;">🏆 Confrontos do mata-mata aparecem aqui conforme o organizador cadastra os jogos das fases <strong style="color:var(--text);">Oitavas, Quartas, Semifinal e Final</strong> na aba Jogos.</div>
+    </div>
+    <div id="bracket-content"></div>
+  </div>
 </div>
+
 
 <!-- REGRAS -->
 <div id="tab-regras" class="section">
@@ -604,6 +642,8 @@ let state = {
 };
 
 let unsubscribe = null; // Firebase listener
+let copaSubtab = 'grupos'; // sub-aba ativa em "Copa do Mundo": 'grupos' | 'mata'
+let grupoSelecionado = null; // grupo A-L selecionado na tabela
 
 // ══════════════════════════════════════════
 // SETUP FLOW
@@ -759,6 +799,7 @@ function showTab(tab, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   if (btn) btn.classList.add('active');
+  if (tab === 'grupos') showCopaSubtab(copaSubtab);
   refresh();
 }
 window.showTab = showTab;
@@ -2033,10 +2074,12 @@ const FLAGS_GRUPOS = {
 function calcClassificacaoGrupos() {
   const jogosBase = state.jogos.length ? state.jogos : JOGOS_PADRAO;
 
-  // Agrupa jogos por grupo
+  // Agrupa jogos por grupo (ignora jogos de mata-mata: Oitavas, Quartas, etc.)
   const porGrupo = {};
   jogosBase.forEach(j => {
+    if (classificarFaseMataMata(j.fase)) return; // pula jogos de mata-mata
     const g = j.grupo || extrairGrupo(j.fase) || '?';
+    if (!/^[A-L]$/.test(g)) return; // só considera grupos válidos A-L
     (porGrupo[g] = porGrupo[g] || []).push(j);
   });
 
@@ -2091,14 +2134,57 @@ function calcClassificacaoGrupos() {
 
     const totalJogos = jogos.length;
     const jogosFinalizados = jogos.filter(j => j.realA !== null && j.realA !== undefined).length;
+    const grupoEncerrado = jogosFinalizados === totalJogos && totalJogos > 0;
 
-    resultado[g] = { lista, totalJogos, jogosFinalizados };
+    // ── Status: Classificado / Eliminado / Em Disputa ──
+    // CLASSIFICADO: o time já encerrou sua participação (0 jogos restantes)
+    //   E nenhum time fora do top2 pode alcançar sua pontuação atual mesmo
+    //   vencendo todos os jogos que lhe restam.
+    // ELIMINADO: mesmo vencendo todos os jogos restantes, o time não alcança
+    //   a pontuação JÁ GARANTIDA pelo atual 2º colocado (esse valor só
+    //   aumenta com o tempo, nunca diminui — por isso é seguro usá-lo).
+    // EM_DISPUTA: qualquer outro caso.
+    // Quando o grupo está encerrado (todos os 6 jogos finalizados),
+    // 1º/2º = Classificado e 3º/4º = Eliminado diretamente
+    // (desconsiderando "melhores terceiros", que dependem dos outros 11 grupos).
+    const jogosPorTime = {};
+    Object.keys(times).forEach(t => { jogosPorTime[t] = 0; });
+    jogos.forEach(j => {
+      if (j.realA === null || j.realA === undefined) {
+        jogosPorTime[j.timeA] = (jogosPorTime[j.timeA]||0) + 1;
+        jogosPorTime[j.timeB] = (jogosPorTime[j.timeB]||0) + 1;
+      }
+    });
+
+    lista.forEach(t => {
+      const restantes = jogosPorTime[t.nome] || 0;
+      t.restantes = restantes;
+      t.ptsMax = t.pts + restantes * 3;
+    });
+
+    // Pontos já garantidos pelo atual 2º colocado (não pode diminuir)
+    const ptsGarantidos2o = lista.length > 1 ? lista[1].pts : 0;
+
+    lista.forEach((t, idx) => {
+      if (grupoEncerrado) {
+        t.status = idx < 2 ? 'classificado' : 'eliminado';
+      } else if (idx < 2) {
+        if (t.restantes === 0) {
+          const ameacas = lista.filter((o,oi) => oi >= 2 && o.ptsMax >= t.pts).length;
+          t.status = ameacas === 0 ? 'classificado' : 'em_disputa';
+        } else {
+          t.status = 'em_disputa';
+        }
+      } else {
+        t.status = (t.ptsMax < ptsGarantidos2o) ? 'eliminado' : 'em_disputa';
+      }
+    });
+
+    resultado[g] = { lista, totalJogos, jogosFinalizados, grupoEncerrado };
   });
 
   return resultado;
 }
-
-let grupoSelecionado = null;
 
 function renderGrupos() {
   const c = document.getElementById('grupos-content');
@@ -2129,6 +2215,11 @@ function renderGrupos() {
     const sgCls = t.sg > 0 ? 'gsaldo-pos' : t.sg < 0 ? 'gsaldo-neg' : '';
     const sgStr = t.sg > 0 ? `+${t.sg}` : `${t.sg}`;
     const flag = FLAGS_GRUPOS[t.nome] || '🏳️';
+    const statusBadge = {
+      classificado: '<span class="status-badge status-classif">✅ Classificado</span>',
+      eliminado: '<span class="status-badge status-elim">❌ Eliminado</span>',
+      em_disputa: '<span class="status-badge status-disputa">⏳ Em disputa</span>',
+    }[t.status] || '';
     return `
       <tr>
         <td><div class="gtime"><span class="gpos ${posCls}">${pos}</span><span>${flag}</span><span>${t.nome}</span></div></td>
@@ -2140,7 +2231,8 @@ function renderGrupos() {
         <td>${t.gp}</td>
         <td>${t.gc}</td>
         <td class="${sgCls}">${sgStr}</td>
-      </tr>`;
+      </tr>
+      <tr class="status-row"><td colspan="9">${statusBadge}</td></tr>`;
   }).join('');
 
   c.innerHTML = `
@@ -2171,6 +2263,112 @@ function selecionarGrupo(g) {
 window.selecionarGrupo = selecionarGrupo;
 
 // ══════════════════════════════════════════
+// SUB-ABAS: GRUPOS vs MATA-MATA
+// ══════════════════════════════════════════
+function showCopaSubtab(tab) {
+  copaSubtab = tab;
+  document.getElementById('copa-sub-grupos').style.display = tab === 'grupos' ? '' : 'none';
+  document.getElementById('copa-sub-mata').style.display = tab === 'mata' ? '' : 'none';
+  document.getElementById('subtab-grupos-btn').classList.toggle('active', tab === 'grupos');
+  document.getElementById('subtab-mata-btn').classList.toggle('active', tab === 'mata');
+  if (tab === 'mata') renderBracket();
+}
+window.showCopaSubtab = showCopaSubtab;
+
+// ══════════════════════════════════════════
+// BRACKET DE MATA-MATA
+// ══════════════════════════════════════════
+// Fases reconhecidas e sua ordem de exibição. O admin cadastra jogos na aba
+// "Jogos" usando esses textos no campo Fase (ex: "Oitavas", "Quartas",
+// "Semifinal", "Final", "Disputa 3º"). Tudo que não casar com a fase de
+// grupos (Grupo A..L) e bater com um desses padrões entra no bracket.
+const FASES_MATA_MATA = [
+  { match: /rodada\s*de\s*32|round\s*of\s*32|16\s*avos|dezesseis/i, label: '🥇 Rodada de 32', icon:'🎯' },
+  { match: /oitava/i,            label: '🏅 Oitavas de Final', icon:'🏅' },
+  { match: /quarta/i,            label: '🥈 Quartas de Final', icon:'🥈' },
+  { match: /semi/i,              label: '🥉 Semifinal', icon:'🥉' },
+  { match: /3.?\s*lugar|terceiro/i, label: '🟤 Disputa de 3º Lugar', icon:'🟤' },
+  { match: /final/i,             label: '🏆 Final', icon:'🏆' },
+];
+
+function classificarFaseMataMata(fase) {
+  if (!fase) return null;
+  // "Final" não deve capturar "Semifinal" — testamos semifinal/3º antes de final
+  for (const f of FASES_MATA_MATA) {
+    if (f.match.test(fase)) return f;
+  }
+  return null;
+}
+
+function renderBracket() {
+  const c = document.getElementById('bracket-content');
+  if (!c) return;
+
+  const jogosBase = state.jogos.length ? state.jogos : [];
+
+  // Agrupa jogos de mata-mata por fase
+  const porFase = {};
+  jogosBase.forEach(j => {
+    const fInfo = classificarFaseMataMata(j.fase);
+    if (!fInfo) return; // jogo de fase de grupos, ignora
+    const key = fInfo.label;
+    (porFase[key] = porFase[key] || { icon: fInfo.icon, jogos: [] }).jogos.push(j);
+  });
+
+  const fasesPresentes = FASES_MATA_MATA.map(f=>f.label).filter(label => porFase[label]);
+
+  if (!fasesPresentes.length) {
+    c.innerHTML = `
+      <div class="empty">
+        <div class="eico">🏆</div>
+        <p>O mata-mata ainda não começou.<br><br>
+        Quando a fase de grupos terminar, o organizador pode cadastrar os confrontos de Oitavas, Quartas, Semifinal e Final na aba <strong style="color:var(--text);">Jogos</strong> — usando essas palavras no campo "Fase".</p>
+      </div>`;
+    return;
+  }
+
+  const html = fasesPresentes.map(label => {
+    const { icon, jogos } = porFase[label];
+    const isFinal = /Final$/.test(label) && !/Semi|3º/.test(label);
+
+    const jogosOrdenados = [...jogos].sort((a,b) => {
+      const da = parseDataHora(a.data||'', a.hora||'00:00');
+      const db = parseDataHora(b.data||'', b.hora||'00:00');
+      return da - db;
+    });
+
+    const jogosHtml = jogosOrdenados.map(j => {
+      const fin = j.realA !== null && j.realA !== undefined;
+      const vencedorA = fin && j.realA > j.realB;
+      const vencedorB = fin && j.realB > j.realA;
+      const meta = [j.data, j.hora].filter(Boolean).join(' • ');
+
+      return `
+        <div class="bracket-jogo ${isFinal?'bfinal':''}">
+          <div class="bracket-row">
+            <span class="bracket-team ${vencedorA?'bwinner':''}">${FLAGS_GRUPOS[j.timeA]||'🏳️'} ${j.timeA||'<span class=\"bracket-tbd\">A definir</span>'}</span>
+            <span class="bracket-score">${fin?j.realA:'—'}</span>
+          </div>
+          <div class="bracket-vs">${fin?'':'vs'}</div>
+          <div class="bracket-row">
+            <span class="bracket-team ${vencedorB?'bwinner':''}">${FLAGS_GRUPOS[j.timeB]||'🏳️'} ${j.timeB||'<span class=\"bracket-tbd\">A definir</span>'}</span>
+            <span class="bracket-score">${fin?j.realB:'—'}</span>
+          </div>
+          ${meta?`<div class="bracket-meta">${meta}</div>`:''}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="bracket-fase">
+        <div class="bracket-fase-hdr">${icon} ${label.replace(/^[^\s]+\s/,'')} <span class="bcount">${jogos.filter(j=>j.realA!==null&&j.realA!==undefined).length}/${jogos.length} finalizados</span></div>
+        ${jogosHtml}
+      </div>`;
+  }).join('');
+
+  c.innerHTML = html;
+}
+
+// ══════════════════════════════════════════
 // REFRESH
 // ══════════════════════════════════════════
 function refresh(){
@@ -2180,6 +2378,7 @@ function refresh(){
   renderRanking();
   renderDashboard();
   renderGrupos();
+  if (copaSubtab === 'mata') renderBracket();
 }
 
 // ══════════════════════════════════════════
