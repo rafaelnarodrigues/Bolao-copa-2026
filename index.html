@@ -1736,11 +1736,17 @@ function renderDashboard() {
       <div class="sub">${session.role==='player'&&myRank>0?`${ranking[myRank-1]?.total||0} pontos`:ranking[0]?ranking[0].total+' pontos':'sem dados'}</div>
     </div>`;
 
-  const prizes=[.6,.3,.1],icons=['🥇','🥈','🥉'],podCls=['pod pod-1','pod','pod'];
-  document.getElementById('dash-podium').innerHTML=[0,1,2].map(i=>{
-    const p=ranking[i];const val=(totalArr*prizes[i]);
-    return`<div class="${podCls[i]}"><div class="pod-icon">${icons[i]}</div><div class="pod-name">${p?.nome||'—'}</div><div class="pod-pts">${p?p.total+' pts':''}</div><div class="pod-prize">R$ ${val.toLocaleString('pt-BR',{minimumFractionDigits:0})}</div></div>`;
-  }).join('');
+  const lider = ranking[0];
+  document.getElementById('dash-podium').innerHTML = lider ? `
+    <div class="pod pod-1" style="grid-column:1/-1;text-align:center;padding:16px;">
+      <div class="pod-icon">🥇</div>
+      <div class="pod-name">${lider.nome}</div>
+      <div class="pod-pts">${lider.total} pts</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;background:rgba(0,156,59,.15);border:1px solid rgba(0,156,59,.3);border-radius:8px;padding:6px 14px;">
+        <span>🏖️</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:.9rem;letter-spacing:1.5px;color:var(--green-light);">Almoço na Praia do Rosa</span>
+      </div>
+    </div>` : '';
 
   const dr=document.getElementById('dash-ranking');
   dr.innerHTML=ranking.slice(0,5).map((p,i)=>{
