@@ -1783,134 +1783,147 @@ function renderHistorico() {
   }
 
   const jogosBase = state.jogos.length ? state.jogos : JOGOS_PADRAO;
-  const jogosNorm = jogosBase.map(j => ({ ...j, r: String(j.r || extrairRodada(j.fase) || '1') }));
+  const myName = session.playerName?.toLowerCase();
 
-  const finalizados = jogosNorm.filter(j => j.realA !== null && j.realA !== undefined);
+  // Filtra só jogos finalizados com data definida
+  const finalizados = jogosBase
+    .filter(j => j.realA !== null && j.realA !== undefined && j.data)
+    .sort((a,b) => parseDataHora(a.data, a.hora||'00:00') - parseDataHora(b.data, b.hora||'00:00'));
+
   if (!finalizados.length) {
     el.innerHTML = '<div class="empty" style="padding:20px;"><p>📈 O gráfico aparece conforme os jogos forem finalizados.</p></div>';
     return;
   }
 
-  const rodadas = ['1','2','3'];
-  const myName = session.playerName?.toLowerCase();
+  // Agrupa por dia (data) — cada ponto do gráfico = 1 dia de jogos
+  const diasMap = {};
+  finalizados.forEach(j => {
+    (diasMap[j.data] = diasMap[j.data] || []).push(j);
+  });
+  const dias = Object.keys(diasMap).sort((a,b) =>
+    parseDataHora(a,'00:00') - parseDataHora(b,'00:00')
+  );
 
-  // Calcula pontuação cumulativa por participante a cada rodada
+  if (dias.length < 1) {
+    el.innerHTML = '<div class="empty" style="padding:20px;"><p>📈 Aguardando dados suficientes.</p></div>';
+    return;
+  }
+
+  // Calcula pontuação cumulativa por participante dia a dia
   const series = state.participantes.map((p, idx) => {
     let acc = 0;
-    const vals = rodadas.map(r => {
-      jogosNorm.filter(j => j.r === r && j.realA !== null && j.realA !== undefined).forEach(j => {
+    const vals = dias.map(dia => {
+      diasMap[dia].forEach(j => {
         const pal = (state.palpites[j.id]||{})[p.id]||{};
         acc += calcPontos(j, pal);
       });
-      let val = acc;
-      if (r === '3') {
-        const acCampeao = !!(state.campeaoReal && p.campeao && p.campeao.toLowerCase().trim()===state.campeaoReal.toLowerCase().trim());
-        const acArtilheiro = !!(state.artilheiroReal && p.artilheiro && p.artilheiro.toLowerCase().trim()===state.artilheiroReal.toLowerCase().trim());
-        val += (acCampeao?15:0)+(acArtilheiro?10:0);
-      }
-      return val;
+      return acc;
     });
+    // Bônus: adiciona ao último dia
+    const acCampeao = !!(state.campeaoReal && p.campeao &&
+      p.campeao.toLowerCase().trim() === state.campeaoReal.toLowerCase().trim());
+    const acArtilheiro = !!(state.artilheiroReal && p.artilheiro &&
+      p.artilheiro.toLowerCase().trim() === state.artilheiroReal.toLowerCase().trim());
+    const bonus = (acCampeao?15:0) + (acArtilheiro?10:0);
+    if (bonus) vals[vals.length-1] += bonus;
+
     const isMe = session.role === 'player' && p.nome.toLowerCase() === myName;
     return { nome: p.nome, vals, isMe, cor: HIST_CORES[idx % HIST_CORES.length] };
   });
 
-  // Determina até qual rodada já existe jogo finalizado (para não desenhar linha "futura")
-  const rodadasComJogo = rodadas.filter(r => jogosNorm.some(j => j.r === r && j.realA !== null && j.realA !== undefined));
-  const ultimaRodadaAtiva = rodadasComJogo.length ? Math.max(...rodadasComJogo.map(Number)) : 1;
+  // Escala
+  const rawMax = Math.max(1, ...series.map(s => Math.max(...s.vals)));
+  const niceMax = Math.max(10, Math.ceil(rawMax / 10) * 10);
 
-  // Escala — arredonda o máximo para um valor "redondo" (múltiplo de 5)
-  const rawMax = Math.max(1, ...series.map(s => Math.max(...s.vals.slice(0, ultimaRodadaAtiva))));
-  const niceMax = Math.max(5, Math.ceil(rawMax / 5) * 5);
-
-  const W = 320, H = 170, padL = 28, padR = 14, padT = 14, padB = 24;
+  const W = 320, H = 170, padL = 30, padR = 10, padT = 14, padB = 28;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const xFor = i => padL + (i/(rodadas.length-1)) * plotW;
-  const yFor = v => padT + plotH - (v/niceMax) * plotH;
+  const n = dias.length;
+  const xFor = i => padL + (n > 1 ? (i / (n-1)) * plotW : plotW/2);
+  const yFor = v => padT + plotH - (v / niceMax) * plotH;
 
-  // Grid horizontal (6 linhas, valores redondos: 0, niceMax/5, ... niceMax)
+  // Grid horizontal
   let gridSvg = '';
-  for (let g = 0; g <= 5; g++) {
-    const v = (niceMax/5) * g;
+  const gridLines = 4;
+  for (let g = 0; g <= gridLines; g++) {
+    const v = (niceMax / gridLines) * g;
     const y = yFor(v);
     gridSvg += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
     gridSvg += `<text x="2" y="${y+3}" font-size="8" fill="var(--text-dim)" font-family="'Barlow Condensed',sans-serif">${Math.round(v)}</text>`;
   }
 
-  // Eixo X labels
+  // Eixo X — mostra só alguns labels para não lotar (máx 6)
   let xLabels = '';
-  rodadas.forEach((r,i) => {
-    xLabels += `<text x="${xFor(i)}" y="${H-6}" font-size="9" fill="var(--text-dim)" text-anchor="middle" font-family="'Barlow Condensed',sans-serif" letter-spacing="1">RODADA ${r}</text>`;
+  const step = Math.ceil(n / 6);
+  dias.forEach((dia, i) => {
+    if (i % step !== 0 && i !== n-1) return;
+    const [d, m] = dia.split('/');
+    xLabels += `<text x="${xFor(i)}" y="${H-6}" font-size="8" fill="var(--text-dim)" text-anchor="middle" font-family="'Barlow Condensed',sans-serif">${d}/${m}</text>`;
   });
 
-  // ── Jitter horizontal para separar pontos empatados ──
-  // Agrupa por (rodada, valor) para distribuir pontos sobrepostos lado a lado
-  const grupos = {}; // key `i|val` -> [seriesIndex,...]
+  // Jitter: separa pontos com mesmo valor e mesmo dia
+  const grupos = {};
   series.forEach((s, si) => {
-    for (let i = 0; i < Math.min(rodadas.length, ultimaRodadaAtiva); i++) {
-      const key = `${i}|${s.vals[i]}`;
+    s.vals.forEach((v, i) => {
+      const key = `${i}|${v}`;
       (grupos[key] = grupos[key] || []).push(si);
-    }
+    });
   });
   function jitterX(si, i, val) {
     const g = grupos[`${i}|${val}`];
     if (!g || g.length <= 1) return 0;
     const pos = g.indexOf(si);
-    const n = g.length;
-    const spread = Math.min(20, 6 * (n - 1)); // px totais de espalhamento
-    return (pos - (n-1)/2) * (spread/(n-1));
+    const spread = Math.min(14, 5 * (g.length - 1));
+    return (pos - (g.length-1)/2) * (spread/(g.length-1));
   }
 
-  // Desenha "você" por último (fica por cima das demais)
-  const ordemDesenho = [...series.keys()].sort((a,b) => (series[a].isMe?1:0) - (series[b].isMe?1:0));
+  // Desenha: outros primeiro, "você" por cima
+  const ordemDesenho = [...series.keys()].sort((a,b) =>
+    (series[a].isMe?1:0) - (series[b].isMe?1:0)
+  );
 
-  // Linhas + pontos (só até a última rodada com jogo finalizado)
-  let linesSvg = '';
-  let dotsSvg = '';
+  let linesSvg = '', dotsSvg = '';
   ordemDesenho.forEach(si => {
     const s = series[si];
-    const pts = [];
-    for (let i = 0; i < rodadas.length; i++) {
-      if (Number(rodadas[i]) > ultimaRodadaAtiva) break;
-      const x = xFor(i) + jitterX(si, i, s.vals[i]);
-      const y = yFor(s.vals[i]);
-      pts.push({x, y});
-    }
-    if (pts.length < 1) return;
-    const strokeW = s.isMe ? 3 : 1.75;
-    const opacity = s.isMe ? 1 : 0.85;
+    const pts = s.vals.map((v, i) => ({
+      x: xFor(i) + jitterX(si, i, v),
+      y: yFor(v)
+    }));
+    const strokeW = s.isMe ? 2.5 : 1.5;
+    const opacity = s.isMe ? 1 : 0.8;
+
     if (pts.length > 1) {
-      const ptsStr = pts.map(p=>`${p.x},${p.y}`).join(' ');
-      linesSvg += `<polyline points="${ptsStr}" fill="none" stroke="${s.cor}" stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>`;
+      linesSvg += `<polyline points="${pts.map(p=>`${p.x},${p.y}`).join(' ')}"
+        fill="none" stroke="${s.cor}" stroke-width="${strokeW}"
+        stroke-linejoin="round" stroke-linecap="round" opacity="${opacity}"/>`;
     }
-    pts.forEach(p => {
-      const r = s.isMe ? 4.5 : 3;
-      // contorno escuro para separar visualmente pontos próximos/sobrepostos
-      dotsSvg += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${s.cor}" opacity="${opacity}" stroke="var(--bg2)" stroke-width="1.5"/>`;
-      if (s.isMe) {
-        dotsSvg += `<circle cx="${p.x}" cy="${p.y}" r="${r+3}" fill="none" stroke="${s.cor}" stroke-width="1" opacity="0.5"/>`;
-      }
-    });
+    // Só desenha ponto no último dia (evita poluição visual com muitos dias)
+    const ultimo = pts[pts.length-1];
+    const r = s.isMe ? 4.5 : 3;
+    dotsSvg += `<circle cx="${ultimo.x}" cy="${ultimo.y}" r="${r}"
+      fill="${s.cor}" opacity="${opacity}" stroke="var(--bg2)" stroke-width="1.5"/>`;
+    if (s.isMe) {
+      dotsSvg += `<circle cx="${ultimo.x}" cy="${ultimo.y}" r="${r+3}"
+        fill="none" stroke="${s.cor}" stroke-width="1" opacity="0.4"/>`;
+    }
   });
 
-  // Legenda — ordenada por pontuação atual (maior primeiro)
-  const legendaOrdenada = [...series].sort((a,b) => {
-    const idx = Math.min(ultimaRodadaAtiva,3)-1;
-    return b.vals[idx] - a.vals[idx];
-  });
+  // Legenda ordenada por pontuação atual
+  const legendaOrdenada = [...series].sort((a,b) =>
+    b.vals[b.vals.length-1] - a.vals[a.vals.length-1]
+  );
   const legenda = legendaOrdenada.map(s => `
     <div style="display:flex;align-items:center;gap:6px;font-size:.72rem;${s.isMe?'font-weight:700;color:var(--text);':'color:var(--text-dim);'}">
-      <span style="width:10px;height:10px;border-radius:50%;background:${s.cor};display:inline-block;flex-shrink:0;${s.isMe?'box-shadow:0 0 0 2px rgba(255,255,255,.15);':''}"></span>
-      ${s.nome}${s.isMe?' <span class="meu-tag">você</span>':''} <span style="color:var(--text-dim);">— ${s.vals[Math.min(ultimaRodadaAtiva,3)-1]} pts</span>
+      <span style="width:10px;height:10px;border-radius:50%;background:${s.cor};flex-shrink:0;display:inline-block;${s.isMe?'box-shadow:0 0 0 2px rgba(255,255,255,.15);':''}"></span>
+      ${s.nome}${s.isMe?' <span class="meu-tag">você</span>':''} <span style="color:var(--text-dim);">— ${s.vals[s.vals.length-1]} pts</span>
     </div>`).join('');
 
   el.innerHTML = `
+    <div style="font-size:.68rem;color:var(--text-dim);margin-bottom:4px;font-family:'Barlow Condensed',sans-serif;">
+      ${dias.length} dias de jogo • ${finalizados.length} jogos finalizados
+    </div>
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;" preserveAspectRatio="xMidYMid meet">
-      ${gridSvg}
-      ${linesSvg}
-      ${dotsSvg}
-      ${xLabels}
+      ${gridSvg}${linesSvg}${dotsSvg}${xLabels}
     </svg>
-    ${ultimaRodadaAtiva < 2 ? `<div style="font-size:.7rem;color:var(--text-dim);text-align:center;margin-top:4px;">Pontos próximos foram levemente separados para melhor visualização.</div>` : ''}
     <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:160px;overflow-y:auto;">${legenda}</div>
   `;
 }
