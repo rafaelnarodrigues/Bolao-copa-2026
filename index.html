@@ -558,11 +558,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="warn-box">Se ainda houver empate, o prêmio é dividido igualmente.</div>
   </div></div>
   <div class="card"><div class="card-header"><h2>💰 Premiação</h2></div><div class="card-body">
-    <div class="premio-grid">
-      <div class="premio-box p1"><div style="font-size:1.6rem;">🥇</div><div class="premio-pct">60%</div><div class="premio-lbl">1º Lugar</div></div>
-      <div class="premio-box"><div style="font-size:1.6rem;">🥈</div><div class="premio-pct">30%</div><div class="premio-lbl">2º Lugar</div></div>
-      <div class="premio-box"><div style="font-size:1.6rem;">🥉</div><div class="premio-pct">10%</div><div class="premio-lbl">3º Lugar</div></div>
+    <div style="background:linear-gradient(135deg,rgba(255,223,0,.12),rgba(0,156,59,.12));border:1px solid rgba(255,223,0,.3);border-radius:12px;padding:18px;text-align:center;margin-bottom:10px;">
+      <div style="font-size:2.8rem;margin-bottom:6px;">🥇</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:var(--gold-light);margin-bottom:4px;">1º Lugar</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:var(--text);margin-bottom:8px;">Almoço pago pelos demais participantes</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(0,0,0,.2);border-radius:8px;padding:10px 16px;">
+        <span style="font-size:1.4rem;">🏖️</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:1.5px;color:var(--green-light);">Praia do Rosa</span>
+      </div>
     </div>
+    <div class="warn-box" style="font-size:.78rem;text-align:center;">🎯 Apenas o campeão do bolão é premiado. Todo o resto paga!</div>
   </div></div>
 </div>
 
@@ -1259,18 +1264,18 @@ function renderPalpites() {
     </div>
     <div class="pal-bonus-card">
       <div class="pal-bonus-title">Palpites Especiais</div>
-      <div class="pal-bonus-desc">Campeão (+15 pts) e Artilheiro (+10 pts) da Copa.</div>
+      <div class="pal-bonus-desc">Campeão (+15 pts) e Artilheiro (+10 pts) da Copa. <strong style="color:var(--gold-light);">Definidos no cadastro — não é possível alterar.</strong></div>
       <div class="form-group">
         <label>🏆 Campeão da Copa</label>
-        <input type="text" id="pal-bonus-campeao" value="${p.campeao||''}"
-          placeholder="Ex: Brasil" autocomplete="off"
-          oninput="onBonusInput(this,'campeao','${p.id}')"/>
+        <div style="background:var(--bg4);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:.95rem;color:${p.campeao?'var(--text)':'var(--text-dim)'};">
+          ${p.campeao || '<em>Não informado</em>'}
+        </div>
       </div>
       <div class="form-group" style="margin-bottom:0;">
         <label>🥅 Artilheiro da Copa</label>
-        <input type="text" id="pal-bonus-artilheiro" value="${p.artilheiro||''}"
-          placeholder="Ex: Vinicius Jr" autocomplete="off"
-          oninput="onBonusInput(this,'artilheiro','${p.id}')"/>
+        <div style="background:var(--bg4);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:.95rem;color:${p.artilheiro?'var(--text)':'var(--text-dim)'};">
+          ${p.artilheiro || '<em>Não informado</em>'}
+        </div>
       </div>
     </div>`;
 
@@ -1347,13 +1352,7 @@ async function salvarTodosPalpites(pid) {
       salvos++;
     }
   });
-  // Bônus
-  const cam  = document.getElementById('pal-bonus-campeao')?.value.trim()  || '';
-  const art  = document.getElementById('pal-bonus-artilheiro')?.value.trim() || '';
-  if (cam || art) {
-    updates[`participantes/${pid}/campeao`]    = cam;
-    updates[`participantes/${pid}/artilheiro`] = art;
-  }
+  // Bônus (campeão/artilheiro) são definidos no cadastro — não salvamos aqui
   if (Object.keys(updates).length) await fbUpdate('', updates);
   toast(`💾 ${salvos} palpites salvos!`);
 }
