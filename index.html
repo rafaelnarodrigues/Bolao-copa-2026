@@ -1763,9 +1763,14 @@ function renderDashboard() {
   const finJ = [...state.jogos.filter(j=>j.realA!==null&&j.realA!==undefined)]
     .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'))
     .slice(-5).reverse();
-  document.getElementById('dash-resultados').innerHTML=finJ.length
-    ?finJ.map(j=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);"><span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;">${j.timeA}</span><span style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold-light);">${j.realA} – ${j.realB}</span><span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;">${j.timeB}</span></div>`).join('')
-    :'<div class="empty" style="padding:20px;"><p>Nenhum resultado ainda.</p></div>';
+  document.getElementById('dash-resultados').innerHTML = finJ.length
+    ? finJ.map(j => `
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:.88rem;font-weight:600;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${j.timeA}</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;color:var(--gold-light);text-align:center;white-space:nowrap;min-width:60px;">${j.realA} – ${j.realB}</span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:.88rem;font-weight:600;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${j.timeB}</span>
+      </div>`).join('')
+    : '<div class="empty" style="padding:20px;"><p>Nenhum resultado ainda.</p></div>';
 
   renderHistorico();
 }
