@@ -1682,15 +1682,18 @@ function renderRanking() {
 
   const totalArr=state.participantes.reduce((s,p)=>s+(p.valor||100),0);
   const prem=document.getElementById('prem-content');
-  const prizes=[{lbl:'🥇 1º',pct:.6},{lbl:'🥈 2º',pct:.3},{lbl:'🥉 3º',pct:.1}];
-  prem.innerHTML=prizes.map((pr,i)=>{
-    const val=(totalArr*pr.pct);
-    const nome=ranking[i]?.nome||'—';
-    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);">
-      <div><div style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:700;">${pr.lbl}</div><div style="font-size:.78rem;color:var(--text-dim);">${nome}</div></div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold-light);">R$ ${val.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+  const vencedor = ranking[0]?.nome || '—';
+  prem.innerHTML = `
+    <div style="text-align:center;padding:8px 0 14px;">
+      <div style="font-size:2.4rem;margin-bottom:4px;">🥇</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--gold-light);">1º Lugar</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:var(--text);margin:4px 0 10px;">${vencedor}</div>
+      <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,156,59,.15);border:1px solid rgba(0,156,59,.3);border-radius:8px;padding:8px 18px;">
+        <span style="font-size:1.2rem;">🏖️</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1.5px;color:var(--green-light);">Almoço na Praia do Rosa</span>
+      </div>
+      <div style="font-size:.72rem;color:var(--text-dim);margin-top:10px;">pago pelos demais participantes</div>
     </div>`;
-  }).join('');
 
   // bônus: se não admin, só leitura
   if(session.role==='admin'){
