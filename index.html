@@ -245,7 +245,23 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .status-elim{background:rgba(230,57,70,.12);color:#ff8a8a}
 .status-disputa{background:rgba(255,223,0,.12);color:var(--gold-light)}
 
-/* BRACKET MATA-MATA */
+/* PAINEL CLASSIFICADOS */
+.classif-header{background:linear-gradient(135deg,var(--blue) 0%,rgba(0,39,118,.6) 100%);border-radius:var(--r);padding:16px;margin-bottom:14px;text-align:center;position:relative;overflow:hidden}
+.classif-header::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 20px,rgba(255,255,255,.02) 20px,rgba(255,255,255,.02) 40px)}
+.classif-header h2{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:4px;color:#fff;margin-bottom:2px;position:relative}
+.classif-header p{font-size:.75rem;color:rgba(255,255,255,.6);position:relative}
+.classif-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+.classif-slot{background:var(--bg3);border:1px solid var(--border);border-radius:10px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px;transition:all .3s}
+.classif-slot.filled{border-color:rgba(0,210,106,.4);background:linear-gradient(135deg,rgba(0,210,106,.08),var(--bg3))}
+.classif-slot.filled-2{border-color:rgba(255,223,0,.3);background:linear-gradient(135deg,rgba(255,223,0,.06),var(--bg3))}
+.classif-slot.empty{opacity:.4}
+.classif-slot .cs-flag{font-size:1.5rem;line-height:1}
+.classif-slot .cs-name{font-family:'Barlow Condensed',sans-serif;font-size:.6rem;font-weight:700;text-align:center;letter-spacing:.3px;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.classif-slot .cs-pos{font-size:.55rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif}
+.classif-slot .cs-empty-icon{font-size:1.2rem;opacity:.3}
+.classif-grupo-label{font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:2px;color:var(--text-dim);margin:12px 0 6px;padding-left:2px}
+.classif-counter{text-align:center;font-family:'Barlow Condensed',sans-serif;font-size:.82rem;color:var(--text-dim);margin-bottom:14px}
+.classif-counter strong{color:var(--green-light);font-size:1rem}
 .bracket-fase{margin-bottom:18px}
 .bracket-fase-hdr{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--gold-light);margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .bracket-fase-hdr .bcount{font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;font-weight:400}
@@ -461,6 +477,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <div class="grupos-tabs" style="margin-bottom:14px;">
     <button class="grupo-tab-btn" id="subtab-grupos-btn" onclick="showCopaSubtab('grupos')">📋 Grupos</button>
+    <button class="grupo-tab-btn" id="subtab-class-btn" onclick="showCopaSubtab('classificados')">✅ Classificados</button>
     <button class="grupo-tab-btn" id="subtab-mata-btn" onclick="showCopaSubtab('mata')">🏆 Mata-Mata</button>
   </div>
 
@@ -470,6 +487,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div style="font-size:.82rem;color:var(--text-dim);line-height:1.6;">📊 Classificação calculada automaticamente com base nos resultados lançados no app. Critérios de desempate: <strong style="color:var(--text);">pontos → saldo de gols → gols pró → confronto direto</strong>.</div>
     </div>
     <div id="grupos-content"></div>
+  </div>
+
+  <!-- SUB-ABA: CLASSIFICADOS -->
+  <div id="copa-sub-classificados" style="display:none;">
+    <div id="classificados-content"></div>
   </div>
 
   <!-- SUB-ABA: MATA-MATA -->
@@ -2291,15 +2313,154 @@ function selecionarGrupo(g) {
 window.selecionarGrupo = selecionarGrupo;
 
 // ══════════════════════════════════════════
-// SUB-ABAS: GRUPOS vs MATA-MATA
+// PAINEL DE CLASSIFICADOS PARA RODADA DE 32
 // ══════════════════════════════════════════
+function renderClassificados() {
+  const c = document.getElementById('classificados-content');
+  if (!c) return;
+
+  const classif = calcClassificacaoGrupos();
+  const grupos = Object.keys(classif).sort();
+
+  // Coleta 1ºs e 2ºs classificados (status=classificado)
+  const primeiros = [];   // 1º de cada grupo confirmado
+  const segundos  = [];   // 2º de cada grupo confirmado
+  const emDisputa1 = []; // 1º atual ainda em disputa
+  const emDisputa2 = []; // 2º atual ainda em disputa
+
+  grupos.forEach(g => {
+    const { lista } = classif[g];
+    if (!lista.length) return;
+
+    const t1 = lista[0]; // atual 1º
+    const t2 = lista[1]; // atual 2º
+
+    if (t1) {
+      if (t1.status === 'classificado') primeiros.push({ ...t1, grupo: g, pos: '1º' });
+      else emDisputa1.push({ ...t1, grupo: g, pos: '1º' });
+    }
+    if (t2) {
+      if (t2.status === 'classificado') segundos.push({ ...t2, grupo: g, pos: '2º' });
+      else emDisputa2.push({ ...t2, grupo: g, pos: '2º' });
+    }
+  });
+
+  const totalConfirmados = primeiros.length + segundos.length;
+  // 32 classificam: 12 primeiros + 12 segundos + 8 melhores terceiros (calculados ao fim)
+  const totalVagas = 32;
+
+  // Função para renderizar um slot
+  function slot(time, tipo) {
+    if (!time) {
+      return `<div class="classif-slot empty">
+        <span class="cs-empty-icon">⬜</span>
+      </div>`;
+    }
+    const flag = FLAGS_GRUPOS[time.nome] || '🏳️';
+    const cls = tipo === '1' ? 'filled' : 'filled-2';
+    const nomeAbrev = time.nome.length > 10 ? time.nome.substring(0,9)+'…' : time.nome;
+    return `<div class="classif-slot ${cls}" title="${time.nome} (${time.pos} do Grupo ${time.grupo})">
+      <span class="cs-flag">${flag}</span>
+      <span class="cs-name">${nomeAbrev}</span>
+      <span class="cs-pos">${time.pos} G.${time.grupo}</span>
+    </div>`;
+  }
+
+  // Monta grid de 1ºs (12 slots)
+  let grid1 = '';
+  for (let i = 0; i < 12; i++) {
+    grid1 += slot(primeiros[i] || null, '1');
+  }
+
+  // Monta grid de 2ºs (12 slots)
+  let grid2 = '';
+  for (let i = 0; i < 12; i++) {
+    grid2 += slot(segundos[i] || null, '2');
+  }
+
+  // 8 melhores terceiros — só confirmados quando todos os grupos encerrarem
+  const gruposEncerrados = grupos.filter(g => classif[g].grupoEncerrado);
+  const terceiros = grupos
+    .map(g => {
+      const t = classif[g].lista[2];
+      return t ? { ...t, grupo: g, pos: '3º' } : null;
+    })
+    .filter(Boolean)
+    .sort((a,b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.sg !== a.sg) return b.sg - a.sg;
+      return b.gp - a.gp;
+    });
+
+  const todosGruposEncerrados = gruposEncerrados.length === 12;
+  const melhoresTerceiros = todosGruposEncerrados ? terceiros.slice(0,8) : [];
+
+  let grid3 = '';
+  for (let i = 0; i < 8; i++) {
+    grid3 += slot(melhoresTerceiros[i] || null, '3');
+  }
+
+  // Em disputa (listagem compacta)
+  const emDisputa = [...emDisputa1, ...emDisputa2]
+    .sort((a,b) => b.pts - a.pts)
+    .slice(0, 8);
+
+  const emDisputaHtml = emDisputa.length ? `
+    <div class="classif-grupo-label" style="color:var(--gold-light);">⏳ Candidatos em disputa</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+      ${emDisputa.map(t => {
+        const flag = FLAGS_GRUPOS[t.nome] || '🏳️';
+        return `<div style="display:flex;align-items:center;gap:5px;background:rgba(255,223,0,.07);border:1px solid rgba(255,223,0,.2);border-radius:8px;padding:5px 10px;font-size:.72rem;font-family:'Barlow Condensed',sans-serif;">
+          ${flag} <strong>${t.nome}</strong> <span style="color:var(--text-dim);">${t.pts}pts · G.${t.grupo}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  c.innerHTML = `
+    <div class="classif-header">
+      <h2>CLASSIFICADOS</h2>
+      <p>Para a Rodada de 32 — Copa do Mundo 2026</p>
+    </div>
+
+    <div class="classif-counter">
+      <strong>${totalConfirmados}</strong> / ${totalVagas} vagas preenchidas
+      <span style="color:rgba(255,255,255,.3);margin:0 6px;">•</span>
+      ${grupos.length - gruposEncerrados.length} grupo(s) em andamento
+    </div>
+
+    <div class="classif-grupo-label">🥇 Primeiros colocados (${primeiros.length}/12)</div>
+    <div class="classif-grid">${grid1}</div>
+
+    <div class="classif-grupo-label" style="color:var(--gold-light);">🥈 Segundos colocados (${segundos.length}/12)</div>
+    <div class="classif-grid">${grid2}</div>
+
+    <div class="classif-grupo-label" style="color:var(--text-dim);">
+      🏅 Melhores terceiros (${melhoresTerceiros.length}/8)
+      ${!todosGruposEncerrados ? '<span style="font-size:.65rem;"> — definidos ao fim da fase de grupos</span>' : ''}
+    </div>
+    <div class="classif-grid" style="grid-template-columns:repeat(4,1fr);">${grid3}</div>
+
+    ${emDisputaHtml}
+
+    <div style="font-size:.68rem;color:var(--text-dim);text-align:center;margin-top:8px;line-height:1.6;">
+      ✅ = matematicamente garantido · ⏳ = ainda em disputa<br>
+      Os 8 melhores terceiros são definidos após todos os grupos encerrarem.
+    </div>
+  `;
+}
+window.renderClassificados = renderClassificados;
+
+
 function showCopaSubtab(tab) {
   copaSubtab = tab;
   document.getElementById('copa-sub-grupos').style.display = tab === 'grupos' ? '' : 'none';
+  document.getElementById('copa-sub-classificados').style.display = tab === 'classificados' ? '' : 'none';
   document.getElementById('copa-sub-mata').style.display = tab === 'mata' ? '' : 'none';
   document.getElementById('subtab-grupos-btn').classList.toggle('active', tab === 'grupos');
+  document.getElementById('subtab-class-btn').classList.toggle('active', tab === 'classificados');
   document.getElementById('subtab-mata-btn').classList.toggle('active', tab === 'mata');
   if (tab === 'mata') renderBracket();
+  if (tab === 'classificados') renderClassificados();
 }
 window.showCopaSubtab = showCopaSubtab;
 
@@ -2407,6 +2568,7 @@ function refresh(){
   renderDashboard();
   renderGrupos();
   if (copaSubtab === 'mata') renderBracket();
+  if (copaSubtab === 'classificados') renderClassificados();
 }
 
 // ══════════════════════════════════════════
