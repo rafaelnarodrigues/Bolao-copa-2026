@@ -560,6 +560,77 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="pts-card pts-0"><div class="pts-val">0</div><div><div class="pts-title">❌ Errou</div><div class="pts-ex">Real 2×0 · Palpite 0×1</div><div class="pts-desc">Errou o resultado.</div></div></div>
     <div class="info-box" style="margin-top:8px;">⚠️ Apenas a maior categoria vale — as categorias não se acumulam.</div>
   </div></div>
+
+  <div class="card"><div class="card-header"><h2>⚡ Multiplicadores — Mata-Mata</h2></div><div class="card-body">
+    <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:14px;line-height:1.6;">Quanto mais avançado o jogo, mais vale acertar. Os pontos base são multiplicados conforme a fase:</div>
+
+    <!-- Faixas por fase -->
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:600;">⚽ Fase de Grupos</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--text-dim);">× 1</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg3);border:1px solid rgba(0,210,106,.3);border-radius:10px;">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:600;">🎯 Rodada de 32 · Oitavas · Quartas</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--green-light);">× 2</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg3);border:1px solid rgba(255,223,0,.3);border-radius:10px;">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:600;">🥉 Semifinal · Disputa 3º Lugar</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:var(--gold-light);">× 3</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:linear-gradient(135deg,rgba(255,223,0,.1),var(--bg3));border:1px solid var(--gold);border-radius:10px;">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:700;">🏆 Final</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--gold-light);">× 4</span>
+      </div>
+    </div>
+
+    <!-- Tabela completa de pontos -->
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:8px;">Tabela de Pontos por Fase</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.75rem;min-width:260px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:7px 6px;font-family:'Barlow Condensed',sans-serif;font-size:.72rem;letter-spacing:.5px;color:var(--text-dim);">Acerto</th>
+            <th style="text-align:center;padding:7px 4px;font-family:'Barlow Condensed',sans-serif;font-size:.72rem;color:var(--text-dim);">Grupos</th>
+            <th style="text-align:center;padding:7px 4px;font-family:'Barlow Condensed',sans-serif;font-size:.72rem;color:var(--green-light);">R32/Oit/Qrt</th>
+            <th style="text-align:center;padding:7px 4px;font-family:'Barlow Condensed',sans-serif;font-size:.72rem;color:var(--gold-light);">Semi/3º</th>
+            <th style="text-align:center;padding:7px 4px;font-family:'Barlow Condensed',sans-serif;font-size:.72rem;color:var(--gold);">Final</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+            <td style="padding:8px 6px;"><span class="acerto-5" style="font-size:.72rem;">⭐ Placar exato</span></td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;">5</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--green-light);">10</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--gold-light);">15</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--gold);">20</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+            <td style="padding:8px 6px;"><span class="acerto-3" style="font-size:.72rem;">✅ Vencedor + saldo</span></td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;">3</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--green-light);">6</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--gold-light);">9</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--gold);">12</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,.04);">
+            <td style="padding:8px 6px;"><span class="acerto-2" style="font-size:.72rem;">🟡 Resultado correto</span></td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;">2</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--green-light);">4</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--gold-light);">6</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--gold);">8</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 6px;font-size:.72rem;color:var(--text-dim);">❌ Errou</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--text-dim);">0</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--text-dim);">0</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--text-dim);">0</td>
+            <td style="text-align:center;padding:8px 4px;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--text-dim);">0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="info-box" style="margin-top:10px;font-size:.75rem;">⚠️ Apenas a maior categoria vale por jogo — não acumulam.</div>
+  </div></div>
   <div class="card"><div class="card-header"><h2>🌟 Bônus</h2></div><div class="card-body">
     <div style="background:rgba(255,223,0,.08);border:1px solid rgba(255,223,0,.22);border-radius:10px;padding:14px;margin-bottom:10px;">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:4px;">🏆 Campeão da Copa</div>
@@ -1630,15 +1701,32 @@ function renderOutrosPalpites(jogo, myPid) {
 // ══════════════════════════════════════════
 // PONTUAÇÃO
 // ══════════════════════════════════════════
+// Multiplicador de pontos por fase do mata-mata:
+// Rodada de 32 / Oitavas / Quartas = x2
+// Semifinal / Disputa 3º = x3
+// Final = x4
+function multiplicadorFase(fase) {
+  if (!fase) return 1;
+  // Ordem importa: checar fases mais específicas antes de "Final"
+  if (/rodada\s*de\s*32|16\s*avos|dezesseis/i.test(fase)) return 2;
+  if (/oitava/i.test(fase)) return 2;
+  if (/quarta/i.test(fase)) return 2;
+  if (/semi/i.test(fase)) return 3;
+  if (/3.?\s*lugar|terceiro/i.test(fase)) return 3;
+  if (/\bfinal\b/i.test(fase)) return 4; // "Final" puro, não captura "Semifinal" etc
+  return 1; // Fase de grupos
+}
+
 function calcPontos(jogo, palpite) {
   if (jogo.realA===null||jogo.realA===undefined||jogo.realB===null) return 0;
   if (palpite.a===''||palpite.a===undefined) return 0;
   const pa=parseInt(palpite.a),pb=parseInt(palpite.b),ra=jogo.realA,rb=jogo.realB;
   if (isNaN(pa)||isNaN(pb)) return 0;
-  if (pa===ra&&pb===rb) return 5;
+  const mult = multiplicadorFase(jogo.fase);
+  if (pa===ra&&pb===rb) return 5 * mult;
   const pd=pa-pb,rd=ra-rb;
-  if (Math.sign(pd)===Math.sign(rd)&&pd===rd) return 3;
-  if (Math.sign(pd)===Math.sign(rd)) return 2;
+  if (Math.sign(pd)===Math.sign(rd)&&pd===rd) return 3 * mult;
+  if (Math.sign(pd)===Math.sign(rd)) return 2 * mult;
   return 0;
 }
 
@@ -2219,13 +2307,49 @@ function calcClassificacaoGrupos() {
       if (grupoEncerrado) {
         t.status = idx < 2 ? 'classificado' : 'eliminado';
       } else if (idx < 2) {
-        if (t.restantes === 0) {
-          const ameacas = lista.filter((o,oi) => oi >= 2 && o.ptsMax >= t.pts).length;
-          t.status = ameacas === 0 ? 'classificado' : 'em_disputa';
-        } else {
-          t.status = 'em_disputa';
-        }
+        // CLASSIFICADO: nenhum time fora do top2 pode garantir pontos >= pts
+        // atuais deste time, considerando que jogos ENTRE concorrentes só
+        // permitem que UM deles vença (não ambos chegam ao ptsMax ao mesmo tempo).
+        // Estratégia conservadora mas correta: verifica se há pelo menos
+        // (n_ameacas) vagas onde ameaças se enfrentam entre si.
+        // Simplificação usada: conta quantos times de fora têm ptsMax >= t.pts.
+        // Se mais de 1 time de fora tem ptsMax >= t.pts E eles jogam entre si
+        // na rodada restante, apenas 1 deles pode chegar lá — então
+        // o número real de ameaças efetivas cai.
+        const candidatos = lista.filter((o, oi) => oi >= 2 && o.ptsMax > t.pts);
+
+        // Verifica se os jogos restantes entre candidatos se "cancelam"
+        // (quando dois candidatos se enfrentam, apenas um pode alcançar ptsMax)
+        let ameacasEfetivas = 0;
+        const jaContado = new Set();
+        candidatos.forEach(c => {
+          if (jaContado.has(c.nome)) return;
+          // Há jogo pendente entre este candidato e outro candidato?
+          const adversarioInterno = candidatos.find(o =>
+            o.nome !== c.nome &&
+            !jaContado.has(o.nome) &&
+            jogos.some(j =>
+              j.realA === null &&
+              ((j.timeA === c.nome && j.timeB === o.nome) ||
+               (j.timeA === o.nome && j.timeB === c.nome))
+            )
+          );
+          if (adversarioInterno) {
+            // Os dois se enfrentam — apenas 1 pode alcançar ptsMax; conta como 1 ameaça
+            ameacasEfetivas++;
+            jaContado.add(c.nome);
+            jaContado.add(adversarioInterno.nome);
+          } else {
+            // Não se enfrentam com outro candidato — ameaça independente
+            ameacasEfetivas++;
+            jaContado.add(c.nome);
+          }
+        });
+
+        t.status = ameacasEfetivas === 0 ? 'classificado' : 'em_disputa';
       } else {
+        // ELIMINADO: mesmo vencendo tudo, não alcança os pontos já
+        // garantidos pelo atual 2º colocado (que só pode manter ou subir)
         t.status = (t.ptsMax < ptsGarantidos2o) ? 'eliminado' : 'em_disputa';
       }
     });
