@@ -2360,6 +2360,48 @@ function calcClassificacaoGrupos() {
     resultado[g] = { lista, totalJogos, jogosFinalizados, grupoEncerrado };
   });
 
+  // ── Segunda passagem: atualiza status dos 3ºs colocados ──────────
+  // Após processar todos os grupos, verifica quais 3ºs estão no top-8
+  // entre todos os grupos (critério FIFA: pts → saldo → gols pró).
+  // Se um grupo ainda está aberto, o 3º fica como em_disputa.
+  // Só marca "classificado" quando todos os grupos estão encerrados.
+  const gruposKeys = Object.keys(resultado).sort();
+  const todosEncerrados = gruposKeys.every(g => resultado[g].grupoEncerrado);
+
+  if (todosEncerrados) {
+    // Todos os grupos terminaram — determina os 8 melhores terceiros definitivamente
+    const todosTerceiros = gruposKeys
+      .map(g => ({ ...resultado[g].lista[2], grupo: g }))
+      .filter(t => t && t.nome)
+      .sort((a,b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.sg !== a.sg) return b.sg - a.sg;
+        if (b.gp !== a.gp) return b.gp - a.gp;
+        return (a.nome||'').localeCompare(b.nome||'');
+      });
+    const top8Nomes = new Set(todosTerceiros.slice(0, 8).map(t => t.nome));
+
+    gruposKeys.forEach(g => {
+      const lista = resultado[g].lista;
+      if (lista[2]) lista[2].status = top8Nomes.has(lista[2].nome) ? 'classificado' : 'eliminado';
+      if (lista[3]) lista[3].status = 'eliminado';
+    });
+  } else {
+    // Grupos ainda em disputa — 3ºs e 4ºs ficam como em_disputa
+    // (exceto os matematicamente impossibilitados, que já marcamos antes)
+    gruposKeys.forEach(g => {
+      const lista = resultado[g].lista;
+      // 3º: se estava marcado como eliminado pelo critério interno do grupo,
+      // muda para em_disputa (pode se classificar via top-8)
+      if (lista[2] && lista[2].status === 'eliminado') lista[2].status = 'em_disputa';
+      // 4º: mantém eliminado se ptsMax não alcança o 2º, senão em_disputa
+      // (4º nunca se classifica diretamente, mas pode ser "em disputa" se ainda tem jogos)
+      if (lista[3] && lista[3].status === 'eliminado' && resultado[g].grupoEncerrado) {
+        lista[3].status = 'eliminado'; // 4º de grupo encerrado = definitivamente eliminado
+      }
+    });
+  }
+
   return resultado;
 }
 
