@@ -245,7 +245,24 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .status-elim{background:rgba(230,57,70,.12);color:#ff8a8a}
 .status-disputa{background:rgba(255,223,0,.12);color:var(--gold-light)}
 
-/* PAINEL CLASSIFICADOS */
+/* MATA-MATA JOGOS & PALPITES */
+.mm-fase-hdr{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--gold-light);margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+.mm-jogo{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.mm-jogo.mm-definido{border-color:rgba(0,210,106,.3)}
+.mm-jogo.mm-indefinido{border-color:rgba(255,255,255,.08);opacity:.75}
+.mm-jogo.mm-final{border-color:var(--gold);background:linear-gradient(135deg,rgba(255,223,0,.07),var(--bg3))}
+.mm-times{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:6px}
+.mm-time{font-family:'Barlow Condensed',sans-serif;font-size:.92rem;font-weight:700;display:flex;align-items:center;gap:5px}
+.mm-time.right{justify-content:flex-end;text-align:right}
+.mm-time.tbd{color:var(--text-dim);font-style:italic;font-weight:400}
+.mm-vs{font-family:'Bebas Neue',sans-serif;font-size:.9rem;color:var(--text-dim);text-align:center}
+.mm-placar{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;color:var(--gold-light);text-align:center;letter-spacing:2px}
+.mm-meta{font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;display:flex;gap:10px;align-items:center}
+.mm-meta .mm-hora{color:var(--gold-light);font-weight:700}
+.mm-input-row{display:grid;grid-template-columns:1fr 60px 1fr;align-items:center;gap:6px;margin-top:8px}
+.mm-input-sep{font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--text-dim);text-align:center}
+.mm-winner{color:var(--green-light);font-weight:700}
+.mm-pts-badge{font-size:.7rem;text-align:center;margin-top:4px}
 .classif-header{background:linear-gradient(135deg,var(--blue) 0%,rgba(0,39,118,.6) 100%);border-radius:var(--r);padding:16px;margin-bottom:14px;text-align:center;position:relative;overflow:hidden}
 .classif-header::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 20px,rgba(255,255,255,.02) 20px,rgba(255,255,255,.02) 40px)}
 .classif-header h2{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:4px;color:#fff;margin-bottom:2px;position:relative}
@@ -404,32 +421,50 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <!-- MEUS PALPITES (player) / TODOS PALPITES (admin) -->
 <div id="tab-palpites" class="section">
   <div class="sec-title" id="pal-section-title">Palpites</div>
+  <div class="grupos-tabs" style="margin-bottom:14px;" id="pal-subtabs">
+    <button class="grupo-tab-btn active" id="pal-sub-grupos-btn" onclick="showPalSubtab('grupos')">⚽ Fase de Grupos</button>
+    <button class="grupo-tab-btn" id="pal-sub-mata-btn" onclick="showPalSubtab('mata')">🏆 Mata-Mata</button>
+  </div>
   <div id="pal-content"></div>
+  <div id="pal-mata-content" style="display:none;"></div>
 </div>
 
 <!-- JOGOS (admin only) -->
 <div id="tab-jogos" class="section">
   <div class="sec-title">Jogos</div>
-  <div class="card" id="card-add-jogo">
-    <div class="card-header"><h2>➕ Cadastrar Jogo</h2></div>
-    <div class="card-body">
-      <div class="form-group"><label>Time A</label><input type="text" id="j-timeA" placeholder="Ex: Brasil" autocomplete="off"/></div>
-      <div class="form-group"><label>Time B</label><input type="text" id="j-timeB" placeholder="Ex: Argentina" autocomplete="off"/></div>
-      <div class="form-group"><label>Data</label><input type="text" id="j-data" placeholder="Ex: 13/06"/></div>
-      <div class="form-group"><label>Horário</label><input type="text" id="j-hora" placeholder="Ex: 16h"/></div>
-      <div class="form-group"><label>Fase / Grupo</label><input type="text" id="j-fase" placeholder="Ex: Grupo C"/></div>
-      <button class="btn btn-gold btn-full" onclick="addJogo()">+ Cadastrar Jogo</button>
+  <div class="grupos-tabs" style="margin-bottom:14px;">
+    <button class="grupo-tab-btn active" id="jog-sub-grupos-btn" onclick="showJogSubtab('grupos')">⚽ Fase de Grupos</button>
+    <button class="grupo-tab-btn" id="jog-sub-mata-btn" onclick="showJogSubtab('mata')">🏆 Mata-Mata</button>
+  </div>
+
+  <!-- SUB: GRUPOS -->
+  <div id="jog-sub-grupos">
+    <div class="card" id="card-add-jogo">
+      <div class="card-header"><h2>➕ Cadastrar Jogo</h2></div>
+      <div class="card-body">
+        <div class="form-group"><label>Time A</label><input type="text" id="j-timeA" placeholder="Ex: Brasil" autocomplete="off"/></div>
+        <div class="form-group"><label>Time B</label><input type="text" id="j-timeB" placeholder="Ex: Argentina" autocomplete="off"/></div>
+        <div class="form-group"><label>Data</label><input type="text" id="j-data" placeholder="Ex: 13/06"/></div>
+        <div class="form-group"><label>Horário</label><input type="text" id="j-hora" placeholder="Ex: 16h"/></div>
+        <div class="form-group"><label>Fase / Grupo</label><input type="text" id="j-fase" placeholder="Ex: Grupo C"/></div>
+        <button class="btn btn-gold btn-full" onclick="addJogo()">+ Cadastrar Jogo</button>
+      </div>
+    </div>
+    <div class="card" id="card-fix-horarios" style="display:none;">
+      <div class="card-body">
+        <div class="warn-box" style="margin-top:0;margin-bottom:10px;" id="fix-horarios-msg"></div>
+        <button class="btn btn-gold btn-full" onclick="fixHorarios()">🕐 Atualizar Datas/Horários Oficiais (FIFA)</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>🏟 Partidas</h2><span class="pill pill-green" id="j-count">0</span></div>
+      <div class="card-body" id="j-lista" style="padding:12px 14px;"></div>
     </div>
   </div>
-  <div class="card" id="card-fix-horarios" style="display:none;">
-    <div class="card-body">
-      <div class="warn-box" style="margin-top:0;margin-bottom:10px;" id="fix-horarios-msg"></div>
-      <button class="btn btn-gold btn-full" onclick="fixHorarios()">🕐 Atualizar Datas/Horários Oficiais (FIFA)</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-header"><h2>🏟 Partidas</h2><span class="pill pill-green" id="j-count">0</span></div>
-    <div class="card-body" id="j-lista" style="padding:12px 14px;"></div>
+
+  <!-- SUB: MATA-MATA -->
+  <div id="jog-sub-mata" style="display:none;">
+    <div id="jog-mata-content"></div>
   </div>
 </div>
 
@@ -2764,6 +2799,289 @@ function renderBracket() {
 // ══════════════════════════════════════════
 // REFRESH
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// SUB-ABAS JOGOS E PALPITES (GRUPOS / MATA-MATA)
+// ══════════════════════════════════════════
+let palSubtab = 'grupos';
+let jogSubtab = 'grupos';
+
+function showPalSubtab(tab) {
+  palSubtab = tab;
+  document.getElementById('pal-content').style.display = tab === 'grupos' ? '' : 'none';
+  document.getElementById('pal-mata-content').style.display = tab === 'mata' ? '' : 'none';
+  document.getElementById('pal-sub-grupos-btn').classList.toggle('active', tab === 'grupos');
+  document.getElementById('pal-sub-mata-btn').classList.toggle('active', tab === 'mata');
+  if (tab === 'mata') renderMataMataJogos('pal');
+}
+window.showPalSubtab = showPalSubtab;
+
+function showJogSubtab(tab) {
+  jogSubtab = tab;
+  document.getElementById('jog-sub-grupos').style.display = tab === 'grupos' ? '' : 'none';
+  document.getElementById('jog-sub-mata').style.display = tab === 'mata' ? '' : 'none';
+  document.getElementById('jog-sub-grupos-btn').classList.toggle('active', tab === 'grupos');
+  document.getElementById('jog-sub-mata-btn').classList.toggle('active', tab === 'mata');
+  if (tab === 'mata') renderMataMataJogos('jog');
+}
+window.showJogSubtab = showJogSubtab;
+
+// ══════════════════════════════════════════
+// CONFRONTOS OFICIAIS DA RODADA DE 32 (FIFA 2026)
+// Formato: [posiçãoA, grupoA, posiçãoB, grupoB, jogo_numero]
+// posição: 1=primeiro, 2=segundo, 3=melhor_terceiro
+// grupoA/B: letra do grupo OU array de grupos candidatos (para terceiros)
+// ══════════════════════════════════════════
+const R32_CONFRONTOS = [
+  // Lado Esquerdo
+  { num: 1,  lado:'E', tA:{pos:1,grp:'E'},      tB:{pos:3,grps:['A','B','C','D','F']} },
+  { num: 2,  lado:'E', tA:{pos:1,grp:'I'},      tB:{pos:3,grps:['C','D','F','G','H']} },
+  { num: 3,  lado:'E', tA:{pos:2,grp:'A'},      tB:{pos:2,grp:'B'} },
+  { num: 4,  lado:'E', tA:{pos:1,grp:'F'},      tB:{pos:2,grp:'C'} },
+  { num: 5,  lado:'E', tA:{pos:2,grp:'K'},      tB:{pos:2,grp:'L'} },
+  { num: 6,  lado:'E', tA:{pos:1,grp:'H'},      tB:{pos:2,grp:'J'} },
+  { num: 7,  lado:'E', tA:{pos:1,grp:'D'},      tB:{pos:3,grps:['B','E','F','I','J']} },
+  { num: 8,  lado:'E', tA:{pos:1,grp:'G'},      tB:{pos:3,grps:['A','E','H','I','J']} },
+  // Lado Direito
+  { num: 9,  lado:'D', tA:{pos:1,grp:'C'},      tB:{pos:2,grp:'F'} },
+  { num: 10, lado:'D', tA:{pos:2,grp:'E'},      tB:{pos:2,grp:'I'} },
+  { num: 11, lado:'D', tA:{pos:1,grp:'A'},      tB:{pos:3,grps:['C','E','F','H','I']} },
+  { num: 12, lado:'D', tA:{pos:1,grp:'L'},      tB:{pos:3,grps:['E','H','I','J','K']} },
+  { num: 13, lado:'D', tA:{pos:1,grp:'J'},      tB:{pos:2,grp:'H'} },
+  { num: 14, lado:'D', tA:{pos:2,grp:'D'},      tB:{pos:2,grp:'G'} },
+  { num: 15, lado:'D', tA:{pos:1,grp:'B'},      tB:{pos:3,grps:['E','F','G','I','J']} },
+  { num: 16, lado:'D', tA:{pos:1,grp:'K'},      tB:{pos:3,grps:['D','E','I','J','L']} },
+];
+
+// Oitavas: vencedor(1)xvencedor(2), venc(3)xvenc(4), ... 
+// Quartas: vencedor(oitavas1)xvencedor(oitavas2), ...
+// Semis: idem, Final: idem
+const FASES_MM = [
+  { id:'r32',    label:'🎯 Rodada de 32',      fase:'Rodada de 32', numJogos:16 },
+  { id:'oitavas',label:'🏅 Oitavas de Final',  fase:'Oitavas',      numJogos:8  },
+  { id:'quartas',label:'🥈 Quartas de Final',  fase:'Quartas',      numJogos:4  },
+  { id:'semi',   label:'🥉 Semifinal',          fase:'Semifinal',    numJogos:2  },
+  { id:'terceiro',label:'🟤 Disputa 3º Lugar', fase:'Disputa 3º Lugar', numJogos:1 },
+  { id:'final',  label:'🏆 Final',              fase:'Final',        numJogos:1  },
+];
+
+// Resolve o nome do time de um slot do R32 a partir da classificação dos grupos
+function resolverTimeR32(slot, classif) {
+  if (slot.pos === 1 || slot.pos === 2) {
+    const g = classif[slot.grp];
+    if (!g) return null;
+    const t = g.lista[slot.pos - 1];
+    if (!t) return null;
+    return { nome: t.nome, definido: t.status === 'classificado' };
+  }
+  // 3º melhor — resolve após todos os grupos fecharem
+  const gruposKeys = Object.keys(classif).sort();
+  const todosEncerrados = gruposKeys.every(g => classif[g].grupoEncerrado);
+  if (!todosEncerrados) {
+    // Mostra o melhor 3º atual dos grupos candidatos como provisório
+    const candidatos = (slot.grps || [])
+      .filter(g => classif[g])
+      .map(g => ({ ...classif[g].lista[2], grupo: g }))
+      .filter(t => t && t.nome)
+      .sort((a,b) => b.pts-a.pts || b.sg-a.sg || b.gp-a.gp);
+    if (!candidatos.length) return null;
+    return { nome: candidatos[0].nome, definido: false, grupos: slot.grps };
+  }
+  // Todos encerrados: pega o top-8 terceiros e verifica qual deles veio dos grupos candidatos
+  const top8 = gruposKeys
+    .map(g => ({ ...classif[g].lista[2], grupo: g }))
+    .filter(t => t && t.nome)
+    .sort((a,b) => b.pts-a.pts || b.sg-a.sg || b.gp-a.gp)
+    .slice(0, 8);
+  const match = top8.find(t => (slot.grps||[]).includes(t.grupo));
+  if (!match) return null;
+  return { nome: match.nome, definido: true };
+}
+
+function renderMataMataJogos(modo) {
+  // modo: 'pal' (palpites player) ou 'jog' (admin jogos)
+  const containerId = modo === 'pal' ? 'pal-mata-content' : 'jog-mata-content';
+  const c = document.getElementById(containerId);
+  if (!c) return;
+
+  const classif = calcClassificacaoGrupos();
+  const jogosBase = state.jogos.length ? state.jogos : [];
+
+  // Agrupa jogos de mata-mata cadastrados por fase
+  const jogosMata = {};
+  jogosBase.forEach(j => {
+    const fInfo = classificarFaseMataMata(j.fase);
+    if (!fInfo) return;
+    const key = fInfo.label;
+    (jogosMata[key] = jogosMata[key] || []).push(j);
+  });
+
+  // Busca jogador atual
+  const isAdmin = session.role === 'admin';
+  const player = !isAdmin ? state.participantes.find(p =>
+    p.nome.toLowerCase() === session.playerName?.toLowerCase()) : null;
+
+  let html = '';
+
+  // ── RODADA DE 32 ─────────────────────────────────────────
+  html += `<div class="mm-fase-hdr">🎯 Rodada de 32 <span style="font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-weight:400;">16 confrontos · ×2 pontos</span></div>`;
+
+  // Verifica se o admin já cadastrou jogos da R32
+  const jogosR32 = (jogosMata['🎯 Rodada de 32'] || [])
+    .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'));
+
+  if (jogosR32.length > 0) {
+    // Usa os jogos reais cadastrados
+    jogosR32.forEach(j => {
+      html += _renderMMJogo(j, player, isAdmin, false);
+    });
+  } else {
+    // Monta os 16 confrontos da R32 a partir da classificação
+    const ladoE = R32_CONFRONTOS.filter(c => c.lado === 'E');
+    const ladoD = R32_CONFRONTOS.filter(c => c.lado === 'D');
+
+    html += `<div style="font-size:.7rem;color:var(--text-dim);margin-bottom:10px;line-height:1.6;padding:8px 10px;background:rgba(255,223,0,.05);border:1px solid rgba(255,223,0,.15);border-radius:8px;">
+      ℹ️ Confrontos calculados automaticamente com base na classificação atual. Times com ⏳ ainda não estão confirmados.
+    </div>`;
+
+    html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:.75rem;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:6px;">LADO ESQUERDO</div>`;
+    ladoE.forEach(conf => { html += _renderMMConfronto(conf, classif); });
+    html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:.75rem;letter-spacing:1.5px;color:var(--text-dim);margin:10px 0 6px;">LADO DIREITO</div>`;
+    ladoD.forEach(conf => { html += _renderMMConfronto(conf, classif); });
+  }
+
+  // ── FASES SEGUINTES (Oitavas em diante) ─────────────────
+  FASES_MM.slice(1).forEach(fase => {
+    const jogsFase = (jogosMata[fase.label] || [])
+      .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'));
+
+    html += `<div class="mm-fase-hdr">${fase.label} <span style="font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-weight:400;">${
+      fase.id==='semi'||fase.id==='terceiro'?'×3':fase.id==='final'?'×4':'×2'
+    } pontos</span></div>`;
+
+    if (jogsFase.length > 0) {
+      jogsFase.forEach(j => { html += _renderMMJogo(j, player, isAdmin, fase.id==='final'); });
+    } else {
+      html += `<div style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;font-size:.78rem;color:var(--text-dim);text-align:center;">
+        A definir — após os jogos anteriores
+      </div>`;
+    }
+  });
+
+  c.innerHTML = html;
+}
+window.renderMataMataJogos = renderMataMataJogos;
+
+// Renderiza um confronto da R32 calculado (sem jogo cadastrado)
+function _renderMMConfronto(conf, classif) {
+  const tA = resolverTimeR32(conf.tA, classif);
+  const tB = resolverTimeR32(conf.tB, classif);
+  const nomeA = tA ? `${FLAGS_GRUPOS[tA.nome]||'🏳️'} ${tA.nome}` : '?';
+  const nomeB = tB ? `${FLAGS_GRUPOS[tB.nome]||'🏳️'} ${tB.nome}` : '?';
+  const label = _labelSlot(conf.tA) + ' × ' + _labelSlot(conf.tB);
+  const definido = tA?.definido && tB?.definido;
+  return `
+    <div class="mm-jogo ${definido?'mm-definido':'mm-indefinido'}">
+      <div class="mm-meta" style="margin-bottom:8px;">
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:.75rem;letter-spacing:1px;">Jogo ${conf.num}</span>
+        <span style="color:rgba(255,255,255,.2)">•</span>
+        <span>${label}</span>
+      </div>
+      <div class="mm-times">
+        <div class="mm-time ${!tA?'tbd':''}">${tA?nomeA:'A definir'} ${tA&&!tA.definido?'<span style="color:var(--gold-light);font-size:.65rem;">⏳</span>':''}</div>
+        <div class="mm-vs">VS</div>
+        <div class="mm-time right ${!tB?'tbd':''}">${tB?nomeB:'A definir'} ${tB&&!tB.definido?'<span style="color:var(--gold-light);font-size:.65rem;">⏳</span>':''}</div>
+      </div>
+    </div>`;
+}
+
+// Label legível do slot (ex: "1º Grupo C" ou "Melhor 3º (A/B/C)")
+function _labelSlot(slot) {
+  const pos = slot.pos === 1 ? '1º' : slot.pos === 2 ? '2º' : 'Mel. 3º';
+  if (slot.grp) return `${pos} G.${slot.grp}`;
+  return `${pos} (${(slot.grps||[]).join('/')})`;
+}
+
+// Renderiza um jogo cadastrado do mata-mata (com palpite se player)
+function _renderMMJogo(j, player, isAdmin, isFinal) {
+  const fin = j.realA !== null && j.realA !== undefined;
+  const flagA = FLAGS_GRUPOS[j.timeA] || '🏳️';
+  const flagB = FLAGS_GRUPOS[j.timeB] || '🏳️';
+  const vencA = fin && j.realA > j.realB;
+  const vencB = fin && j.realB > j.realA;
+  const meta = [j.data, j.hora, j.fase].filter(Boolean);
+
+  let palHtml = '';
+  if (player) {
+    const pal = (state.palpites[j.id]||{})[player.id]||{};
+    const ga = pal.a !== undefined ? pal.a : '';
+    const gb = pal.b !== undefined ? pal.b : '';
+    const bloq = isJogoBloqueado(j);
+    const pts = (ga!==''&&gb!==''&&fin) ? calcPontos(j,pal) : null;
+    let ptsCls='',ptsIcon='';
+    if(pts===null){}else if(pts>=20)ptsIcon='⭐';else if(pts>=12)ptsIcon='✅';else if(pts>=8)ptsIcon='🟡';else if(pts===0&&fin)ptsIcon='❌';
+
+    if (fin) {
+      palHtml = ga!=='' ? `<div class="mm-pts-badge">${ptsIcon} Seu palpite: ${ga}×${gb} ${pts!==null?`— ${pts} pts`:''}` : '';
+    } else if (!bloq) {
+      palHtml = `
+        <div class="mm-input-row" style="margin-top:10px;">
+          <input type="number" class="pal-score ${ga!==''?'filled':''}" id="pi-${j.id}-a"
+            value="${ga}" min="0" max="30" inputmode="numeric" placeholder="?"
+            data-jid="${j.id}" data-lado="a" data-pid="${player.id}" data-r="mata"
+            oninput="onPalInput(this)" onfocus="this.select()"/>
+          <span class="mm-input-sep">×</span>
+          <input type="number" class="pal-score ${gb!==''?'filled':''}" id="pi-${j.id}-b"
+            value="${gb}" min="0" max="30" inputmode="numeric" placeholder="?"
+            data-jid="${j.id}" data-lado="b" data-pid="${player.id}" data-r="mata"
+            oninput="onPalInput(this)" onfocus="this.select()"/>
+        </div>`;
+    } else if (ga!=='') {
+      palHtml = `<div class="mm-pts-badge" style="margin-top:6px;">${ptsIcon} Seu palpite: ${ga}×${gb}${pts!==null?` — ${pts} pts`:''}</div>`;
+    } else {
+      palHtml = `<div style="font-size:.68rem;color:#ff8a8a;margin-top:6px;text-align:center;">🔒 Encerrado — sem palpite registrado</div>`;
+    }
+    if (ga!=='' && player) {
+      palHtml += _renderOutrosMM(j);
+    }
+  }
+
+  return `
+    <div class="mm-jogo ${fin?'mm-definido':''} ${isFinal?'mm-final':''}">
+      <div class="mm-meta" style="margin-bottom:8px;">
+        ${j.hora?`<span class="mm-hora">${j.hora}</span><span style="color:rgba(255,255,255,.2)">•</span>`:''}
+        <span>${j.data||''}</span>
+        ${j.fase?`<span style="color:rgba(255,255,255,.2)">•</span><span>${j.fase}</span>`:''}
+      </div>
+      <div class="mm-times">
+        <div class="mm-time ${vencA?'mm-winner':''}">${flagA} ${j.timeA||'A definir'}</div>
+        <div>${fin
+          ? `<div class="mm-placar">${j.realA}–${j.realB}</div>`
+          : `<div class="mm-vs">VS</div>`}
+        </div>
+        <div class="mm-time right ${vencB?'mm-winner':''}">${j.timeB||'A definir'} ${flagB}</div>
+      </div>
+      ${palHtml}
+    </div>`;
+}
+
+// Palpites dos outros participantes no mata-mata
+function _renderOutrosMM(j) {
+  if (!state.participantes.length) return '';
+  const lista = state.participantes.map(part => {
+    const pal = (state.palpites[j.id]||{})[part.id]||{};
+    if (pal.a === undefined || pal.a === '') return null;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.78rem;">
+      <span>${part.nome}</span>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:.95rem;">${pal.a}–${pal.b}</span>
+    </div>`;
+  }).filter(Boolean);
+  if (!lista.length) return '';
+  return `<details class="pal-outros" style="margin-top:8px;">
+    <summary>👥 Ver palpites (${lista.length}/${state.participantes.length})</summary>
+    <div style="margin-top:6px;">${lista.join('')}</div>
+  </details>`;
+}
+
 function refresh(){
   renderParticipantes();
   renderJogos();
@@ -2773,6 +3091,8 @@ function refresh(){
   renderGrupos();
   if (copaSubtab === 'mata') renderBracket();
   if (copaSubtab === 'classificados') renderClassificados();
+  if (palSubtab === 'mata') renderMataMataJogos('pal');
+  if (jogSubtab === 'mata') renderMataMataJogos('jog');
 }
 
 // ══════════════════════════════════════════
