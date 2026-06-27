@@ -2975,22 +2975,90 @@ window.renderMataMataJogos = renderMataMataJogos;
 function _renderMMConfronto(conf, classif) {
   const tA = resolverTimeR32(conf.tA, classif);
   const tB = resolverTimeR32(conf.tB, classif);
-  const nomeA = tA ? `${FLAGS_GRUPOS[tA.nome]||'🏳️'} ${tA.nome}` : '?';
-  const nomeB = tB ? `${FLAGS_GRUPOS[tB.nome]||'🏳️'} ${tB.nome}` : '?';
+  const nomeA = tA ? `${FLAGS_GRUPOS[tA.nome]||'🏳️'} ${tA.nome}` : null;
+  const nomeB = tB ? `${FLAGS_GRUPOS[tB.nome]||'🏳️'} ${tB.nome}` : null;
   const label = _labelSlot(conf.tA) + ' × ' + _labelSlot(conf.tB);
-  const definido = tA?.definido && tB?.definido;
+  const definido = !!(tA?.nome && tB?.nome);
+
+  // Tenta encontrar jogo cadastrado pelo admin que corresponda a esses times
+  const jogoReal = state.jogos.find(j => {
+    const fInfo = classificarFaseMataMata(j.fase);
+    if (!fInfo) return false;
+    return (
+      (normTxt(j.timeA||'') === normTxt(tA?.nome||'') && normTxt(j.timeB||'') === normTxt(tB?.nome||'')) ||
+      (normTxt(j.timeA||'') === normTxt(tB?.nome||'') && normTxt(j.timeB||'') === normTxt(tA?.nome||''))
+    );
+  });
+
+  const data = jogoReal?.data || '';
+  const hora = jogoReal?.hora || '';
+  const jid  = jogoReal?.id || `r32-${conf.num}`;
+
+  // Player para palpite
+  const isAdmin = session.role === 'admin';
+  const player = !isAdmin ? state.participantes.find(p =>
+    p.nome.toLowerCase() === session.playerName?.toLowerCase()) : null;
+
+  let palHtml = '';
+  if (definido && player && jogoReal) {
+    const pal = (state.palpites[jogoReal.id]||{})[player.id]||{};
+    const ga = pal.a !== undefined ? pal.a : '';
+    const gb = pal.b !== undefined ? pal.b : '';
+    const fin = jogoReal.realA !== null && jogoReal.realA !== undefined;
+    const bloq = isJogoBloqueado(jogoReal);
+    const pts = (ga!==''&&gb!==''&&fin) ? calcPontos(jogoReal,pal) : null;
+    let ptsIcon = '';
+    if(pts!==null){if(pts>=20)ptsIcon='⭐';else if(pts>=12)ptsIcon='✅';else if(pts>=8)ptsIcon='🟡';else if(pts===0)ptsIcon='❌';}
+
+    if (fin) {
+      palHtml = ga!=='' ? `<div class="mm-pts-badge">${ptsIcon} Seu palpite: ${ga}×${gb}${pts!==null?` — ${pts} pts`:''}</div>` : '';
+    } else if (!bloq) {
+      palHtml = `
+        <div class="mm-input-row" style="margin-top:10px;">
+          <input type="number" class="pal-score ${ga!==''?'filled':''}" id="pi-${jogoReal.id}-a"
+            value="${ga}" min="0" max="30" inputmode="numeric" placeholder="?"
+            data-jid="${jogoReal.id}" data-lado="a" data-pid="${player.id}" data-r="mata"
+            oninput="onPalInput(this)" onfocus="this.select()"/>
+          <span class="mm-input-sep">×</span>
+          <input type="number" class="pal-score ${gb!==''?'filled':''}" id="pi-${jogoReal.id}-b"
+            value="${gb}" min="0" max="30" inputmode="numeric" placeholder="?"
+            data-jid="${jogoReal.id}" data-lado="b" data-pid="${player.id}" data-r="mata"
+            oninput="onPalInput(this)" onfocus="this.select()"/>
+        </div>
+        ${_renderOutrosMM(jogoReal)}`;
+    } else {
+      palHtml = ga!==''
+        ? `<div class="mm-pts-badge">${ptsIcon} Seu palpite: ${ga}×${gb}${pts!==null?` — ${pts} pts`:''}</div>`
+        : `<div style="font-size:.68rem;color:#ff8a8a;margin-top:6px;text-align:center;">🔒 Encerrado — sem palpite</div>`;
+    }
+  } else if (definido && player && !jogoReal) {
+    // Times definidos mas jogo ainda não cadastrado pelo admin
+    palHtml = `<div style="font-size:.68rem;color:var(--text-dim);margin-top:8px;text-align:center;">⏳ Palpite disponível após o organizador confirmar a data do jogo</div>`;
+  }
+
+  // Resultado se jogo real e finalizado
+  let placarHtml = '<div class="mm-vs">VS</div>';
+  if (jogoReal && jogoReal.realA !== null && jogoReal.realA !== undefined) {
+    const vA = jogoReal.realA > jogoReal.realB;
+    const vB = jogoReal.realB > jogoReal.realA;
+    placarHtml = `<div class="mm-placar">${jogoReal.realA}–${jogoReal.realB}</div>`;
+  }
+
   return `
     <div class="mm-jogo ${definido?'mm-definido':'mm-indefinido'}">
       <div class="mm-meta" style="margin-bottom:8px;">
-        <span style="font-family:'Bebas Neue',sans-serif;font-size:.75rem;letter-spacing:1px;">Jogo ${conf.num}</span>
+        ${hora ? `<span class="mm-hora">${hora}</span><span style="color:rgba(255,255,255,.2)">•</span>` : ''}
+        ${data ? `<span>${data}</span><span style="color:rgba(255,255,255,.2)">•</span>` : ''}
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:.72rem;letter-spacing:1px;color:var(--text-dim);">Jogo ${conf.num}</span>
         <span style="color:rgba(255,255,255,.2)">•</span>
-        <span>${label}</span>
+        <span style="font-size:.68rem;color:var(--text-dim);">${label}</span>
       </div>
       <div class="mm-times">
-        <div class="mm-time ${!tA?'tbd':''}">${tA?nomeA:'A definir'} ${tA&&!tA.definido?'<span style="color:var(--gold-light);font-size:.65rem;">⏳</span>':''}</div>
-        <div class="mm-vs">VS</div>
-        <div class="mm-time right ${!tB?'tbd':''}">${tB?nomeB:'A definir'} ${tB&&!tB.definido?'<span style="color:var(--gold-light);font-size:.65rem;">⏳</span>':''}</div>
+        <div class="mm-time ${!tA?'tbd':''}">${nomeA||'A definir'} ${tA&&!tA.definido?'<span style="color:var(--gold-light);font-size:.65rem;">⏳</span>':''}</div>
+        ${placarHtml}
+        <div class="mm-time right ${!tB?'tbd':''}">${nomeB||'A definir'} ${tB&&!tB.definido?'<span style="color:var(--gold-light);font-size:.65rem;">⏳</span>':''}</div>
       </div>
+      ${palHtml}
     </div>`;
 }
 
