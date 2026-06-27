@@ -2873,28 +2873,33 @@ function resolverTimeR32(slot, classif) {
     if (!t) return null;
     return { nome: t.nome, definido: t.status === 'classificado' };
   }
-  // 3º melhor — resolve após todos os grupos fecharem
+  // 3º melhor — usa cache global para evitar duplicação entre confrontos
   const gruposKeys = Object.keys(classif).sort();
   const todosEncerrados = gruposKeys.every(g => classif[g].grupoEncerrado);
-  if (!todosEncerrados) {
-    // Mostra o melhor 3º atual dos grupos candidatos como provisório
-    const candidatos = (slot.grps || [])
-      .filter(g => classif[g])
+
+  if (todosEncerrados) {
+    // Todos encerrados: top-8 já calculado, verifica qual veio dos grupos candidatos
+    const top8 = gruposKeys
       .map(g => ({ ...classif[g].lista[2], grupo: g }))
       .filter(t => t && t.nome)
-      .sort((a,b) => b.pts-a.pts || b.sg-a.sg || b.gp-a.gp);
-    if (!candidatos.length) return null;
-    return { nome: candidatos[0].nome, definido: false, grupos: slot.grps };
+      .sort((a,b) => b.pts-a.pts || b.sg-a.sg || b.gp-a.gp)
+      .slice(0, 8);
+    const match = top8.find(t => (slot.grps||[]).includes(t.grupo));
+    if (!match) return null;
+    return { nome: match.nome, definido: true };
   }
-  // Todos encerrados: pega o top-8 terceiros e verifica qual deles veio dos grupos candidatos
-  const top8 = gruposKeys
+
+  // Não todos encerrados: mostra o melhor 3º DOS GRUPOS CANDIDATOS
+  // Filtra apenas grupos já encerrados para mostrar terceiros definitivos
+  // ou o atual 3º parcial dos grupos abertos
+  const candidatos = (slot.grps || [])
+    .filter(g => classif[g])
     .map(g => ({ ...classif[g].lista[2], grupo: g }))
     .filter(t => t && t.nome)
-    .sort((a,b) => b.pts-a.pts || b.sg-a.sg || b.gp-a.gp)
-    .slice(0, 8);
-  const match = top8.find(t => (slot.grps||[]).includes(t.grupo));
-  if (!match) return null;
-  return { nome: match.nome, definido: true };
+    .sort((a,b) => b.pts-a.pts || b.sg-a.sg || b.gp-a.gp);
+  if (!candidatos.length) return null;
+  // Usa o melhor candidato desse slot específico (pode haver sobreposição visual, é provisório)
+  return { nome: candidatos[0].nome, definido: false, grupos: slot.grps };
 }
 
 function renderMataMataJogos(modo) {
@@ -3001,14 +3006,25 @@ function _renderMMConfronto(conf, classif) {
   const player = !isAdmin ? state.participantes.find(p =>
     p.nome.toLowerCase() === session.playerName?.toLowerCase()) : null;
 
+  // Jogo virtual: usa o jogo real do Firebase se existir,
+  // ou cria um objeto com data/hora do conf para calcular bloqueio e salvar palpite
+  const jogoParaPalpite = jogoReal || (definido && tA?.nome && tB?.nome ? {
+    id: `r32-${conf.num}`,
+    timeA: tA.nome, timeB: tB.nome,
+    data: conf.data, hora: conf.hora,
+    fase: 'Rodada de 32',
+    realA: null, realB: null
+  } : null);
+
   let palHtml = '';
-  if (definido && player && jogoReal) {
-    const pal = (state.palpites[jogoReal.id]||{})[player.id]||{};
+  if (definido && player && jogoParaPalpite) {
+    const jid = jogoParaPalpite.id;
+    const pal = (state.palpites[jid]||{})[player.id]||{};
     const ga = pal.a !== undefined ? pal.a : '';
     const gb = pal.b !== undefined ? pal.b : '';
-    const fin = jogoReal.realA !== null && jogoReal.realA !== undefined;
-    const bloq = isJogoBloqueado(jogoReal);
-    const pts = (ga!==''&&gb!==''&&fin) ? calcPontos(jogoReal,pal) : null;
+    const fin = jogoParaPalpite.realA !== null && jogoParaPalpite.realA !== undefined;
+    const bloq = isJogoBloqueado(jogoParaPalpite);
+    const pts = (ga!==''&&gb!==''&&fin) ? calcPontos(jogoParaPalpite, pal) : null;
     let ptsIcon = '';
     if(pts!==null){if(pts>=20)ptsIcon='⭐';else if(pts>=12)ptsIcon='✅';else if(pts>=8)ptsIcon='🟡';else if(pts===0)ptsIcon='❌';}
 
@@ -3017,25 +3033,24 @@ function _renderMMConfronto(conf, classif) {
     } else if (!bloq) {
       palHtml = `
         <div class="mm-input-row" style="margin-top:10px;">
-          <input type="number" class="pal-score ${ga!==''?'filled':''}" id="pi-${jogoReal.id}-a"
+          <input type="number" class="pal-score ${ga!==''?'filled':''}" id="pi-${jid}-a"
             value="${ga}" min="0" max="30" inputmode="numeric" placeholder="?"
-            data-jid="${jogoReal.id}" data-lado="a" data-pid="${player.id}" data-r="mata"
+            data-jid="${jid}" data-lado="a" data-pid="${player.id}" data-r="mata"
             oninput="onPalInput(this)" onfocus="this.select()"/>
           <span class="mm-input-sep">×</span>
-          <input type="number" class="pal-score ${gb!==''?'filled':''}" id="pi-${jogoReal.id}-b"
+          <input type="number" class="pal-score ${gb!==''?'filled':''}" id="pi-${jid}-b"
             value="${gb}" min="0" max="30" inputmode="numeric" placeholder="?"
-            data-jid="${jogoReal.id}" data-lado="b" data-pid="${player.id}" data-r="mata"
+            data-jid="${jid}" data-lado="b" data-pid="${player.id}" data-r="mata"
             oninput="onPalInput(this)" onfocus="this.select()"/>
         </div>
-        ${_renderOutrosMM(jogoReal)}`;
+        ${jogoReal ? _renderOutrosMM(jogoReal) : ''}`;
     } else {
       palHtml = ga!==''
         ? `<div class="mm-pts-badge">${ptsIcon} Seu palpite: ${ga}×${gb}${pts!==null?` — ${pts} pts`:''}</div>`
         : `<div style="font-size:.68rem;color:#ff8a8a;margin-top:6px;text-align:center;">🔒 Encerrado — sem palpite</div>`;
     }
-  } else if (definido && player && !jogoReal) {
-    // Times definidos mas jogo ainda não cadastrado pelo admin
-    palHtml = `<div style="font-size:.68rem;color:var(--text-dim);margin-top:8px;text-align:center;">⏳ Palpite disponível após o organizador confirmar a data do jogo</div>`;
+  } else if (definido && player && !tA?.nome) {
+    palHtml = `<div style="font-size:.68rem;color:var(--text-dim);margin-top:8px;text-align:center;">⏳ Aguardando definição dos times</div>`;
   }
 
   // Resultado se jogo real e finalizado
