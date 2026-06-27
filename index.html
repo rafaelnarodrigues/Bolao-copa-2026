@@ -2833,23 +2833,23 @@ window.showJogSubtab = showJogSubtab;
 // ══════════════════════════════════════════
 const R32_CONFRONTOS = [
   // Lado Esquerdo
-  { num: 1,  lado:'E', tA:{pos:1,grp:'E'},      tB:{pos:3,grps:['A','B','C','D','F']} },
-  { num: 2,  lado:'E', tA:{pos:1,grp:'I'},      tB:{pos:3,grps:['C','D','F','G','H']} },
-  { num: 3,  lado:'E', tA:{pos:2,grp:'A'},      tB:{pos:2,grp:'B'} },
-  { num: 4,  lado:'E', tA:{pos:1,grp:'F'},      tB:{pos:2,grp:'C'} },
-  { num: 5,  lado:'E', tA:{pos:2,grp:'K'},      tB:{pos:2,grp:'L'} },
-  { num: 6,  lado:'E', tA:{pos:1,grp:'H'},      tB:{pos:2,grp:'J'} },
-  { num: 7,  lado:'E', tA:{pos:1,grp:'D'},      tB:{pos:3,grps:['B','E','F','I','J']} },
-  { num: 8,  lado:'E', tA:{pos:1,grp:'G'},      tB:{pos:3,grps:['A','E','H','I','J']} },
+  { num:1,  lado:'E', data:'29/06', hora:'17h30', tA:{pos:1,grp:'E'},      tB:{pos:3,grps:['A','B','C','D','F']} }, // Alemanha x 3ºABCDF
+  { num:2,  lado:'E', data:'30/06', hora:'18h',   tA:{pos:1,grp:'I'},      tB:{pos:3,grps:['C','D','F','G','H']} }, // 1ºI x 3ºCDFGH
+  { num:3,  lado:'E', data:'28/06', hora:'16h',   tA:{pos:2,grp:'A'},      tB:{pos:2,grp:'B'} },                    // África do Sul x Canadá
+  { num:4,  lado:'E', data:'29/06', hora:'22h',   tA:{pos:1,grp:'F'},      tB:{pos:2,grp:'C'} },                    // Países Baixos x Marrocos
+  { num:5,  lado:'E', data:'02/07', hora:'20h',   tA:{pos:2,grp:'K'},      tB:{pos:2,grp:'L'} },                    // 2ºK x 2ºL
+  { num:6,  lado:'E', data:'02/07', hora:'16h',   tA:{pos:1,grp:'H'},      tB:{pos:2,grp:'J'} },                    // 1ºH x 2ºJ
+  { num:7,  lado:'E', data:'01/07', hora:'21h',   tA:{pos:1,grp:'D'},      tB:{pos:3,grps:['B','E','F','I','J']} }, // EUA x Bósnia e Herz.
+  { num:8,  lado:'E', data:'01/07', hora:'17h',   tA:{pos:1,grp:'G'},      tB:{pos:3,grps:['A','E','H','I','J']} }, // 1ºG x 3ºAEHIJ
   // Lado Direito
-  { num: 9,  lado:'D', tA:{pos:1,grp:'C'},      tB:{pos:2,grp:'F'} },
-  { num: 10, lado:'D', tA:{pos:2,grp:'E'},      tB:{pos:2,grp:'I'} },
-  { num: 11, lado:'D', tA:{pos:1,grp:'A'},      tB:{pos:3,grps:['C','E','F','H','I']} },
-  { num: 12, lado:'D', tA:{pos:1,grp:'L'},      tB:{pos:3,grps:['E','H','I','J','K']} },
-  { num: 13, lado:'D', tA:{pos:1,grp:'J'},      tB:{pos:2,grp:'H'} },
-  { num: 14, lado:'D', tA:{pos:2,grp:'D'},      tB:{pos:2,grp:'G'} },
-  { num: 15, lado:'D', tA:{pos:1,grp:'B'},      tB:{pos:3,grps:['E','F','G','I','J']} },
-  { num: 16, lado:'D', tA:{pos:1,grp:'K'},      tB:{pos:3,grps:['D','E','I','J','L']} },
+  { num:9,  lado:'D', data:'29/06', hora:'14h',   tA:{pos:1,grp:'C'},      tB:{pos:2,grp:'F'} },                    // Brasil x Japão
+  { num:10, lado:'D', data:'30/06', hora:'14h',   tA:{pos:2,grp:'E'},      tB:{pos:2,grp:'I'} },                    // Costa do Marfim x 2ºI
+  { num:11, lado:'D', data:'30/06', hora:'22h',   tA:{pos:1,grp:'A'},      tB:{pos:3,grps:['C','E','F','H','I']} }, // México x 3ºCEFHI
+  { num:12, lado:'D', data:'01/07', hora:'13h',   tA:{pos:1,grp:'L'},      tB:{pos:3,grps:['E','H','I','J','K']} }, // 1ºL x 3ºEHIJK
+  { num:13, lado:'D', data:'03/07', hora:'19h',   tA:{pos:1,grp:'J'},      tB:{pos:2,grp:'H'} },                    // Argentina x 2ºH
+  { num:14, lado:'D', data:'03/07', hora:'15h',   tA:{pos:2,grp:'D'},      tB:{pos:2,grp:'G'} },                    // Austrália x 2ºG
+  { num:15, lado:'D', data:'02/07', hora:'00h',   tA:{pos:1,grp:'B'},      tB:{pos:3,grps:['E','F','G','I','J']} }, // Suíça x 3ºEFGIJ
+  { num:16, lado:'D', data:'03/07', hora:'22h30', tA:{pos:1,grp:'K'},      tB:{pos:3,grps:['D','E','I','J','L']} }, // 1ºK x 3ºDEIJL
 ];
 
 // Oitavas: vencedor(1)xvencedor(2), venc(3)xvenc(4), ... 
@@ -2943,10 +2943,12 @@ function renderMataMataJogos(modo) {
       ℹ️ Confrontos calculados automaticamente com base na classificação atual. Times com ⏳ ainda não estão confirmados.
     </div>`;
 
-    html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:.75rem;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:6px;">LADO ESQUERDO</div>`;
-    ladoE.forEach(conf => { html += _renderMMConfronto(conf, classif); });
-    html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:.75rem;letter-spacing:1.5px;color:var(--text-dim);margin:10px 0 6px;">LADO DIREITO</div>`;
-    ladoD.forEach(conf => { html += _renderMMConfronto(conf, classif); });
+    // Ordena por data/hora
+    const r32Ordenados = [...R32_CONFRONTOS].sort((a,b) =>
+      parseDataHora(a.data||'', a.hora||'00:00') - parseDataHora(b.data||'', b.hora||'00:00')
+    );
+
+    r32Ordenados.forEach(conf => { html += _renderMMConfronto(conf, classif); });
   }
 
   // ── FASES SEGUINTES (Oitavas em diante) ─────────────────
@@ -2990,8 +2992,8 @@ function _renderMMConfronto(conf, classif) {
     );
   });
 
-  const data = jogoReal?.data || '';
-  const hora = jogoReal?.hora || '';
+  const data = jogoReal?.data || conf.data || '';
+  const hora = jogoReal?.hora || conf.hora || '';
   const jid  = jogoReal?.id || `r32-${conf.num}`;
 
   // Player para palpite
