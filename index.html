@@ -464,6 +464,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <!-- SUB: MATA-MATA -->
   <div id="jog-sub-mata" style="display:none;">
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-body">
+        <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:10px;line-height:1.6;">
+          Cadastra automaticamente os 16 jogos da Rodada de 32 com datas e horários oficiais da FIFA. Jogos já cadastrados não são duplicados.
+        </div>
+        <button class="btn btn-gold btn-full" onclick="seedMataMata()">⚡ Cadastrar Rodada de 32 no Firebase</button>
+      </div>
+    </div>
     <div id="jog-mata-content"></div>
   </div>
 </div>
@@ -2176,6 +2184,56 @@ async function fixHorarios() {
   toast(`✅ ${corrigidos} jogo(s) atualizado(s) com data/horário oficiais!${semCorrespondencia ? ` (${semCorrespondencia} sem correspondência)` : ''}`);
 }
 window.fixHorarios = fixHorarios;
+
+// ══════════════════════════════════════════
+// SEED MATA-MATA — cadastra os 16 jogos da Rodada de 32
+// com confrontos e horários oficiais confirmados pela FIFA.
+// Só cadastra jogos que ainda não existem no Firebase.
+// ══════════════════════════════════════════
+async function seedMataMata() {
+  if (session.role !== 'admin') return;
+
+  // Jogos confirmados da Rodada de 32 (fonte: FIFA / CNN Brasil / Trivela)
+  // Horário de Brasília (BRT). Times com 'TBD' ainda não definidos.
+  const MATA_MATA_R32 = [
+    { id:'r32-3',  timeA:'África do Sul', timeB:'Canadá',          data:'28/06', hora:'16h',   fase:'Rodada de 32' },
+    { id:'r32-9',  timeA:'Brasil',        timeB:'Japão',           data:'29/06', hora:'14h',   fase:'Rodada de 32' },
+    { id:'r32-1',  timeA:'Alemanha',      timeB:'TBD',             data:'29/06', hora:'17h30', fase:'Rodada de 32' }, // 1ºE x mel.3º ABCDF
+    { id:'r32-4',  timeA:'Holanda',       timeB:'Marrocos',        data:'29/06', hora:'22h',   fase:'Rodada de 32' },
+    { id:'r32-10', timeA:'Costa do Marfim',timeB:'Noruega',        data:'30/06', hora:'14h',   fase:'Rodada de 32' }, // 2ºE x 2ºI
+    { id:'r32-2',  timeA:'França',        timeB:'TBD',             data:'30/06', hora:'18h',   fase:'Rodada de 32' }, // 1ºI x mel.3º CDFGH
+    { id:'r32-11', timeA:'México',        timeB:'TBD',             data:'30/06', hora:'22h',   fase:'Rodada de 32' }, // 1ºA x mel.3º CEFHI
+    { id:'r32-12', timeA:'Inglaterra',    timeB:'TBD',             data:'01/07', hora:'13h',   fase:'Rodada de 32' }, // 1ºL x mel.3º EHIJK
+    { id:'r32-8',  timeA:'Bélgica',       timeB:'TBD',             data:'01/07', hora:'17h',   fase:'Rodada de 32' }, // 1ºG x mel.3º AEHIJ
+    { id:'r32-7',  timeA:'Estados Unidos',timeB:'Bósnia e Herz.',  data:'01/07', hora:'21h',   fase:'Rodada de 32' }, // 1ºD x mel.3º BEFIJ
+    { id:'r32-15', timeA:'Suíça',         timeB:'TBD',             data:'02/07', hora:'00h',   fase:'Rodada de 32' }, // 1ºB x mel.3º EFGIJ
+    { id:'r32-6',  timeA:'Espanha',       timeB:'TBD',             data:'02/07', hora:'16h',   fase:'Rodada de 32' }, // 1ºH x 2ºJ
+    { id:'r32-5',  timeA:'TBD',           timeB:'TBD',             data:'02/07', hora:'20h',   fase:'Rodada de 32' }, // 2ºK x 2ºL
+    { id:'r32-14', timeA:'Austrália',     timeB:'Egito',           data:'03/07', hora:'15h',   fase:'Rodada de 32' }, // 2ºD x 2ºG
+    { id:'r32-13', timeA:'Argentina',     timeB:'TBD',             data:'03/07', hora:'19h',   fase:'Rodada de 32' }, // 1ºJ x 2ºH
+    { id:'r32-16', timeA:'TBD',           timeB:'TBD',             data:'03/07', hora:'22h30', fase:'Rodada de 32' }, // 1ºK x mel.3º DEIJL
+  ];
+
+  // Verifica quais jogos já existem no Firebase
+  const idsExistentes = new Set(state.jogos.map(j => j.id));
+  const updates = {};
+  let cadastrados = 0;
+
+  MATA_MATA_R32.forEach(j => {
+    if (idsExistentes.has(j.id)) return; // não duplica
+    updates[`jogos/${j.id}`] = { ...j, realA: null, realB: null };
+    cadastrados++;
+  });
+
+  if (!cadastrados) {
+    toast('✅ Todos os jogos da Rodada de 32 já estão cadastrados!');
+    return;
+  }
+
+  await fbUpdate('', updates);
+  toast(`✅ ${cadastrados} jogo(s) da Rodada de 32 cadastrado(s)!`);
+}
+window.seedMataMata = seedMataMata;
 
 function normTxt(s) {
   return (s||'').toLowerCase().trim()
