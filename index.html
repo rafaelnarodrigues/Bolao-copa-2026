@@ -1099,8 +1099,17 @@ function renderJogos() {
   if (!state.jogos.length) { lista.innerHTML = '<div class="empty"><div class="eico">🏟</div><p>Nenhum jogo cadastrado.</p></div>'; return; }
   const isAdmin = session.role === 'admin';
 
+  // Filtra apenas jogos da fase de grupos (exclui mata-mata)
+  const jogosFaseGrupos = state.jogos.filter(j => !classificarFaseMataMata(j.fase));
+  count.textContent = jogosFaseGrupos.length + ' jogos';
+
+  if (!jogosFaseGrupos.length) {
+    lista.innerHTML = '<div class="empty"><div class="eico">🏟</div><p>Nenhum jogo de grupos cadastrado.</p></div>';
+    return;
+  }
+
   // Ordena por data → hora
-  const jogosOrdenados = [...state.jogos].sort((a, b) => {
+  const jogosOrdenados = [...jogosFaseGrupos].sort((a, b) => {
     const da = parseDataHora(a.data || '', a.hora || '00:00');
     const db = parseDataHora(b.data || '', b.hora || '00:00');
     return da - db;
@@ -1272,7 +1281,9 @@ function renderPalpites() {
   }
 
   // Usa jogos do Firebase SE existirem; senão usa os 72 pré-definidos
-  const jogosBase = state.jogos.length ? state.jogos : JOGOS_PADRAO;
+  // Filtra apenas jogos da fase de grupos (mata-mata vai na sub-aba própria)
+  const todosJogos = state.jogos.length ? state.jogos : JOGOS_PADRAO;
+  const jogosBase = todosJogos.filter(j => !classificarFaseMataMata(j.fase));
 
   // Normaliza campo: garante que todo jogo tem .r e .grupo
   const jogosNorm = jogosBase.map(j => ({
@@ -1480,7 +1491,8 @@ async function salvarPalpiteInline(jid, pid) {
 }
 
 async function salvarTodosPalpites(pid) {
-  const jogosBase = state.jogos.length ? state.jogos : JOGOS_PADRAO;
+  const todos = state.jogos.length ? state.jogos : JOGOS_PADRAO;
+  const jogosBase = todos.filter(j => !classificarFaseMataMata(j.fase));
   const updates = {};
   let salvos = 0;
   jogosBase.forEach(j => {
@@ -1507,7 +1519,8 @@ window.onPalInput   = onPalInput;
 window.salvarTodosPalpites = salvarTodosPalpites;
 
 function atualizarProgressoInline(pid, r) {
-  const jogosBase = state.jogos.length ? state.jogos : JOGOS_PADRAO;
+  const todos = state.jogos.length ? state.jogos : JOGOS_PADRAO;
+  const jogosBase = todos.filter(j => !classificarFaseMataMata(j.fase));
   const total = jogosBase.length;
   let done = 0;
   jogosBase.forEach(j => {
@@ -2961,76 +2974,55 @@ function resolverTimeR32(slot, classif) {
 }
 
 function renderMataMataJogos(modo) {
-  // modo: 'pal' (palpites player) ou 'jog' (admin jogos)
   const containerId = modo === 'pal' ? 'pal-mata-content' : 'jog-mata-content';
   const c = document.getElementById(containerId);
   if (!c) return;
 
-  const classif = calcClassificacaoGrupos();
-  const jogosBase = state.jogos.length ? state.jogos : [];
-
-  // Agrupa jogos de mata-mata cadastrados por fase
-  const jogosMata = {};
-  jogosBase.forEach(j => {
-    const fInfo = classificarFaseMataMata(j.fase);
-    if (!fInfo) return;
-    const key = fInfo.label;
-    (jogosMata[key] = jogosMata[key] || []).push(j);
-  });
-
-  // Busca jogador atual
   const isAdmin = session.role === 'admin';
   const player = !isAdmin ? state.participantes.find(p =>
     p.nome.toLowerCase() === session.playerName?.toLowerCase()) : null;
 
-  let html = '';
+  // Apenas jogos de mata-mata CADASTRADOS no Firebase
+  const jogosMata = {};
+  state.jogos.forEach(j => {
+    const fInfo = classificarFaseMataMata(j.fase);
+    if (!fInfo) return;
+    (jogosMata[fInfo.label] = jogosMata[fInfo.label] || []).push(j);
+  });
 
-  // ── RODADA DE 32 ─────────────────────────────────────────
-  html += `<div class="mm-fase-hdr">🎯 Rodada de 32 <span style="font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-weight:400;">16 confrontos · ×2 pontos</span></div>`;
+  const temAlgumJogo = Object.keys(jogosMata).length > 0;
 
-  // Verifica se o admin já cadastrou jogos da R32
-  const jogosR32 = (jogosMata['🎯 Rodada de 32'] || [])
-    .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'));
-
-  if (jogosR32.length > 0) {
-    // Usa os jogos reais cadastrados
-    jogosR32.forEach(j => {
-      html += _renderMMJogo(j, player, isAdmin, false);
-    });
-  } else {
-    // Monta os 16 confrontos da R32 a partir da classificação
-    const ladoE = R32_CONFRONTOS.filter(c => c.lado === 'E');
-    const ladoD = R32_CONFRONTOS.filter(c => c.lado === 'D');
-
-    html += `<div style="font-size:.7rem;color:var(--text-dim);margin-bottom:10px;line-height:1.6;padding:8px 10px;background:rgba(255,223,0,.05);border:1px solid rgba(255,223,0,.15);border-radius:8px;">
-      ℹ️ Confrontos calculados automaticamente com base na classificação atual. Times com ⏳ ainda não estão confirmados.
+  if (!temAlgumJogo) {
+    c.innerHTML = `<div class="empty" style="padding:30px 16px;">
+      <div class="eico">🏆</div>
+      <p>Nenhum jogo do mata-mata cadastrado ainda.</p>
+      ${isAdmin ? '<p style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Use o botão acima para cadastrar a Rodada de 32.</p>' : ''}
     </div>`;
-
-    // Ordena por data/hora
-    const r32Ordenados = [...R32_CONFRONTOS].sort((a,b) =>
-      parseDataHora(a.data||'', a.hora||'00:00') - parseDataHora(b.data||'', b.hora||'00:00')
-    );
-
-    r32Ordenados.forEach(conf => { html += _renderMMConfronto(conf, classif); });
+    return;
   }
 
-  // ── FASES SEGUINTES (Oitavas em diante) ─────────────────
-  FASES_MM.slice(1).forEach(fase => {
+  let html = '';
+
+  // Renderiza cada fase na ordem oficial
+  FASES_MM.forEach(fase => {
     const jogsFase = (jogosMata[fase.label] || [])
       .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'));
 
-    html += `<div class="mm-fase-hdr">${fase.label} <span style="font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-weight:400;">${
-      fase.id==='semi'||fase.id==='terceiro'?'×3':fase.id==='final'?'×4':'×2'
-    } pontos</span></div>`;
+    if (!jogsFase.length) return; // só mostra fases que têm jogos cadastrados
 
-    if (jogsFase.length > 0) {
-      jogsFase.forEach(j => { html += _renderMMJogo(j, player, isAdmin, fase.id==='final'); });
-    } else {
-      html += `<div style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;font-size:.78rem;color:var(--text-dim);text-align:center;">
-        A definir — após os jogos anteriores
-      </div>`;
-    }
+    const mult = (fase.id==='semi'||fase.id==='terceiro') ? '×3' : fase.id==='final' ? '×4' : '×2';
+
+    html += `<div class="mm-fase-hdr">${fase.label} <span style="font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-weight:400;">${mult} pontos</span></div>`;
+
+    jogsFase.forEach(j => {
+      html += _renderMMJogo(j, player, isAdmin, fase.id === 'final');
+    });
   });
+
+  if (!html) {
+    c.innerHTML = `<div class="empty" style="padding:30px 16px;"><div class="eico">🏆</div><p>Nenhum jogo cadastrado.</p></div>`;
+    return;
+  }
 
   c.innerHTML = html;
 }
