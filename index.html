@@ -2782,12 +2782,12 @@ window.showCopaSubtab = showCopaSubtab;
 // "Semifinal", "Final", "Disputa 3º"). Tudo que não casar com a fase de
 // grupos (Grupo A..L) e bater com um desses padrões entra no bracket.
 const FASES_MATA_MATA = [
-  { match: /rodada\s*de\s*32|round\s*of\s*32|16\s*avos|dezesseis/i, label: '🥇 Rodada de 32', icon:'🎯' },
-  { match: /oitava/i,            label: '🏅 Oitavas de Final', icon:'🏅' },
-  { match: /quarta/i,            label: '🥈 Quartas de Final', icon:'🥈' },
-  { match: /semi/i,              label: '🥉 Semifinal', icon:'🥉' },
-  { match: /3.?\s*lugar|terceiro/i, label: '🟤 Disputa de 3º Lugar', icon:'🟤' },
-  { match: /final/i,             label: '🏆 Final', icon:'🏆' },
+  { match: /rodada\s*de\s*32|round\s*of\s*32|16\s*avos|dezesseis/i, label: '🎯 Rodada de 32',      icon:'🎯' },
+  { match: /oitava/i,                                                 label: '🏅 Oitavas de Final',  icon:'🏅' },
+  { match: /quarta/i,                                                 label: '🥈 Quartas de Final',  icon:'🥈' },
+  { match: /semi/i,                                                   label: '🥉 Semifinal',          icon:'🥉' },
+  { match: /3.?\s*lugar|terceiro/i,                                   label: '🟤 Disputa 3º Lugar',  icon:'🟤' },
+  { match: /\bfinal\b/i,                                              label: '🏆 Final',              icon:'🏆' },
 ];
 
 function classificarFaseMataMata(fase) {
