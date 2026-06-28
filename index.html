@@ -2975,16 +2975,22 @@ function renderMataMataJogos(modo) {
   if (!c) return;
 
   const isAdmin = session.role === 'admin';
-  const player = !isAdmin ? state.participantes.find(p =>
-    p.nome.toLowerCase() === session.playerName?.toLowerCase()) : null;
 
-  // Apenas jogos de mata-mata CADASTRADOS no Firebase
+  // Agrupa jogos de mata-mata por fase, deduplicando por par de times
   const jogosMata = {};
-  state.jogos.forEach(j => {
-    const fInfo = classificarFaseMataMata(j.fase);
-    if (!fInfo) return;
-    (jogosMata[fInfo.label] = jogosMata[fInfo.label] || []).push(j);
-  });
+  const vistos = new Set(); // evita duplicatas pelo par timeA+timeB
+
+  state.jogos
+    .filter(j => classificarFaseMataMata(j.fase))
+    .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'))
+    .forEach(j => {
+      const fInfo = classificarFaseMataMata(j.fase);
+      // Chave de deduplicação: par de times normalizado (independente da ordem)
+      const parKey = [normTxt(j.timeA||''), normTxt(j.timeB||'')].sort().join('|');
+      if (vistos.has(parKey) && parKey !== '|') return; // ignora duplicata
+      vistos.add(parKey);
+      (jogosMata[fInfo.label] = jogosMata[fInfo.label] || []).push(j);
+    });
 
   const temAlgumJogo = Object.keys(jogosMata).length > 0;
 
@@ -2999,19 +3005,45 @@ function renderMataMataJogos(modo) {
 
   let html = '';
 
-  // Renderiza cada fase na ordem oficial
   FASES_MM.forEach(fase => {
-    const jogsFase = (jogosMata[fase.label] || [])
-      .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'));
-
-    if (!jogsFase.length) return; // só mostra fases que têm jogos cadastrados
+    const jogsFase = jogosMata[fase.label] || [];
+    if (!jogsFase.length) return;
 
     const mult = (fase.id==='semi'||fase.id==='terceiro') ? '×3' : fase.id==='final' ? '×4' : '×2';
-
     html += `<div class="mm-fase-hdr">${fase.label} <span style="font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-weight:400;">${mult} pontos</span></div>`;
 
+    let lastData = null;
     jogsFase.forEach(j => {
-      html += _renderMMJogo(j, player, isAdmin, fase.id === 'final');
+      const fin = j.realA !== null && j.realA !== undefined;
+      // Separador de data
+      if (j.data && j.data !== lastData) {
+        lastData = j.data;
+        html += `<div style="font-size:.7rem;font-family:'Barlow Condensed',sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin:10px 0 6px;padding-left:2px;">${formatarData(j.data)}</div>`;
+      }
+      // Usa o mesmo layout de jogo-card da fase de grupos
+      html += `
+        <div class="jogo-card ${fin?'fim':''} ${fase.id==='final'?'jogo-final':''}">
+          <div class="jogo-meta">
+            ${j.hora?`<span style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.75rem;">${j.hora}</span>`:''}
+            ${j.fase?`<span class="fase-badge" style="background:rgba(255,223,0,.15);color:var(--gold-light);">${j.fase}</span>`:''}
+          </div>
+          <div class="jogo-times">
+            <div class="jogo-team">${FLAGS_GRUPOS[j.timeA]||'🏳️'} ${j.timeA}</div>
+            <div>${fin?`<div class="jogo-placar">${j.realA}–${j.realB}</div>`:`<div class="jogo-vs">VS</div>`}</div>
+            <div class="jogo-team right">${j.timeB} ${FLAGS_GRUPOS[j.timeB]||'🏳️'}</div>
+          </div>
+          <div class="jogo-btns">
+            ${isAdmin?`<button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openResultModal('${j.id}')">⚽ ${fin?'Editar':'Resultado'}</button>`:''}
+            <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openPalpiteModal('${j.id}')">🎯 Palpite</button>
+            ${isAdmin?`<button class="btn btn-danger btn-sm" onclick="removeJogo('${j.id}')">✕</button>`:''}
+          </div>
+          ${isAdmin?`<div class="confirm-box" id="confirm-j-${j.id}">
+            <div class="confirm-msg">Remover <strong>${j.timeA} × ${j.timeB}</strong>?</div>
+            <div class="confirm-btns">
+              <button class="btn btn-danger btn-sm" onclick="confirmRemoveJ('${j.id}')">🗑 Remover</button>
+              <button class="btn btn-ghost btn-sm" onclick="removeJogo('${j.id}')">Cancelar</button>
+            </div></div>`:''}
+        </div>`;
     });
   });
 
