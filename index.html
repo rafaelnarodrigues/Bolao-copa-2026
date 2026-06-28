@@ -1178,7 +1178,7 @@ function openPalpiteModal(jid) {
       `<button class="btn btn-gold btn-full" style="margin-top:14px;" onclick="saveAllPalpites('${jid}')">💾 Salvar Todos</button>
        <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="closeModal('modal-palpite')">Fechar</button>`;
   } else {
-    // Player vê só seu palpite
+    // Player: vê seu palpite + palpites de todos os outros
     const p = state.participantes.find(x => x.nome.toLowerCase() === session.playerName.toLowerCase());
     if (!p) {
       document.getElementById('mpal-body').innerHTML = `<div class="empty"><div class="eico">⚠️</div><p>Seu nome "<strong>${session.playerName}</strong>" não foi encontrado na lista de participantes.<br><br>Peça ao organizador para te cadastrar.</p></div>`;
@@ -1187,6 +1187,33 @@ function openPalpiteModal(jid) {
     const pal = (state.palpites[jid]||{})[p.id]||{};
     const fin = j.realA !== null && j.realA !== undefined;
     const bloqueado = isJogoBloqueado(j);
+
+    // Seção de palpites de todos os participantes
+    const todosPalpites = state.participantes.map(part => {
+      const palPart = (state.palpites[jid]||{})[part.id]||{};
+      const isMe = part.id === p.id;
+      const temPal = palPart.a !== undefined && palPart.a !== '';
+      if (!temPal) return null;
+      const pts = fin ? calcPontos(j, palPart) : null;
+      let ptsCls = '', ptsIcon = '';
+      if (pts!==null) {
+        if(pts>=20||pts===5){ptsCls='acerto-5';ptsIcon='⭐';}
+        else if(pts>=12||pts===3){ptsCls='acerto-3';ptsIcon='✅';}
+        else if(pts>=8||pts===2){ptsCls='acerto-2';ptsIcon='🟡';}
+        else if(pts===0){ptsIcon='❌';}
+      }
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.9rem;${isMe?'font-weight:700;color:var(--gold-light);':''}">
+            ${part.nome}${isMe?' <span class="meu-tag">você</span>':''}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;">${palPart.a}–${palPart.b}</span>
+            ${pts!==null?`<span class="${ptsCls}" style="font-size:.72rem;">${ptsIcon} ${pts}pts</span>`:''}
+          </div>
+        </div>`;
+    }).filter(Boolean);
+
     document.getElementById('mpal-body').innerHTML = `
       <div style="text-align:center;margin-bottom:16px;font-family:'Barlow Condensed',sans-serif;font-size:.9rem;color:var(--text-dim);">Seu palpite para este jogo:</div>
       <div class="placar-row">
@@ -1203,7 +1230,14 @@ function openPalpiteModal(jid) {
         : bloqueado
           ? `<div class="warn-box" style="text-align:center;">🔒 Palpites encerrados — menos de 10 minutos para o início da partida.</div>`
           : `<button class="btn btn-gold btn-full" style="margin-top:14px;" onclick="saveMyPalpite('${jid}','${p.id}')">💾 Salvar Meu Palpite</button>`}
-      <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="closeModal('modal-palpite')">Fechar</button>`;
+
+      ${todosPalpites.length ? `
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:1.5px;color:var(--text-dim);margin-bottom:8px;">👥 PALPITES DO BOLÃO (${todosPalpites.length}/${state.participantes.length})</div>
+          ${todosPalpites.join('')}
+        </div>` : ''}
+
+      <button class="btn btn-ghost btn-full" style="margin-top:12px;" onclick="closeModal('modal-palpite')">Fechar</button>`;
   }
   openModal('modal-palpite');
 }
