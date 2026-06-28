@@ -3008,6 +3008,75 @@ function renderMataMataJogos(modo) {
   const c = document.getElementById(containerId);
   if (!c) return;
 
+  // ── MODO PAL: tabela igual à fase de grupos ──────────────
+  if (modo === 'pal') {
+    // Coleta jogos de mata-mata sem duplicatas
+    const jogosMataOrdenados = [];
+    const vistosP = new Set();
+    state.jogos
+      .filter(j => classificarFaseMataMata(j.fase))
+      .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'))
+      .forEach(j => {
+        const pk = [normTxt(j.timeA||''), normTxt(j.timeB||'')].sort().join('|');
+        if (vistosP.has(pk) && pk !== '|') return;
+        vistosP.add(pk);
+        jogosMataOrdenados.push(j);
+      });
+
+    if (!jogosMataOrdenados.length) {
+      c.innerHTML = `<div class="empty" style="padding:30px;"><div class="eico">🏆</div><p>Nenhum jogo do mata-mata cadastrado ainda.</p></div>`;
+      return;
+    }
+
+    const hdr = state.participantes.map(p => `<th>${p.nome}</th>`).join('');
+    let lastFase = null;
+    const rows = jogosMataOrdenados.map(j => {
+      const fin = j.realA !== null && j.realA !== undefined;
+      const fInfo = classificarFaseMataMata(j.fase);
+      const mult = multiplicadorFase(j.fase);
+
+      // Separador de fase
+      let faseRow = '';
+      if (fInfo && fInfo.label !== lastFase) {
+        lastFase = fInfo.label;
+        const multLabel = mult > 1 ? ` <span style="color:var(--green-light);font-size:.65rem;">×${mult}</span>` : '';
+        faseRow = `<tr><td colspan="${state.participantes.length + 1}" style="background:var(--bg4);padding:8px 10px;font-family:'Bebas Neue',sans-serif;font-size:.8rem;letter-spacing:1.5px;color:var(--gold-light);">${fInfo.label}${multLabel}</td></tr>`;
+      }
+
+      const cells = state.participantes.map(p => {
+        const pal = (state.palpites[j.id]||{})[p.id]||{};
+        if (pal.a===''||pal.a===undefined) return '<td style="color:var(--text-dim)">—</td>';
+        const pts = calcPontos(j, pal);
+        let cls = '';
+        if (fin) {
+          if (pts >= 5*mult) cls='acerto-5';
+          else if (pts >= 3*mult) cls='acerto-3';
+          else if (pts >= 2*mult) cls='acerto-2';
+          else if (pts > 0) cls='acerto-2';
+        }
+        return `<td><span class="${cls}">${pal.a}×${pal.b}${fin?` <small>(${pts})</small>`:''}</span></td>`;
+      }).join('');
+
+      const label = fin?`<span class="pill pill-green" style="font-size:.65rem;">${j.realA}×${j.realB}</span>`:'';
+      const meta = [j.data, j.hora].filter(Boolean).join(' ');
+      const dataRow = `<tr><td style="white-space:nowrap;font-size:.8rem;">${meta?`<div style="font-size:.65rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;">${meta}</div>`:''}<strong>${FLAGS_GRUPOS[j.timeA]||''} ${j.timeA}</strong> ${label} <strong>${j.timeB} ${FLAGS_GRUPOS[j.timeB]||''}</strong></td>${cells}</tr>`;
+      return faseRow + dataRow;
+    }).join('');
+
+    c.innerHTML = `
+      <div class="card">
+        <div class="card-header"><h2>🏆 Palpites Mata-Mata</h2></div>
+        <div class="pal-scroll">
+          <table class="pal-table">
+            <thead><tr><th>Jogo</th>${hdr}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // ── MODO JOG: cards com editar/palpite (admin) ──────────
   const isAdmin = session.role === 'admin';
 
   // Agrupa jogos de mata-mata por fase, deduplicando por par de times
