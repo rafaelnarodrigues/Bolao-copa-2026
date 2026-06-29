@@ -3010,6 +3010,8 @@ function renderMataMataJogos(modo) {
 
   // ── MODO PAL: tabela igual à fase de grupos ──────────────
   if (modo === 'pal') {
+    const isAdminPal = session.role === 'admin';
+
     // Coleta jogos de mata-mata sem duplicatas
     const jogosMataOrdenados = [];
     const vistosP = new Set();
@@ -3028,51 +3030,114 @@ function renderMataMataJogos(modo) {
       return;
     }
 
-    const hdr = state.participantes.map(p => `<th>${p.nome}</th>`).join('');
-    let lastFase = null;
-    const rows = jogosMataOrdenados.map(j => {
+    // ── ADMIN: tabela completa ──
+    if (isAdminPal) {
+      const hdr = state.participantes.map(p => `<th>${p.nome}</th>`).join('');
+      let lastFase = null;
+      const rows = jogosMataOrdenados.map(j => {
+        const fin = j.realA !== null && j.realA !== undefined;
+        const fInfo = classificarFaseMataMata(j.fase);
+        const mult = multiplicadorFase(j.fase);
+        let faseRow = '';
+        if (fInfo && fInfo.label !== lastFase) {
+          lastFase = fInfo.label;
+          const multLabel = mult > 1 ? ` <span style="color:var(--green-light);font-size:.65rem;">×${mult}</span>` : '';
+          faseRow = `<tr><td colspan="${state.participantes.length + 1}" style="background:var(--bg4);padding:8px 10px;font-family:'Bebas Neue',sans-serif;font-size:.8rem;letter-spacing:1.5px;color:var(--gold-light);">${fInfo.label}${multLabel}</td></tr>`;
+        }
+        const cells = state.participantes.map(p => {
+          const pal = (state.palpites[j.id]||{})[p.id]||{};
+          if (pal.a===''||pal.a===undefined) return '<td style="color:var(--text-dim)">—</td>';
+          const pts = calcPontos(j, pal);
+          let cls = '';
+          if (fin) {
+            if (pts >= 5*mult) cls='acerto-5';
+            else if (pts >= 3*mult) cls='acerto-3';
+            else if (pts >= 2*mult) cls='acerto-2';
+            else if (pts > 0) cls='acerto-2';
+          }
+          return `<td><span class="${cls}">${pal.a}×${pal.b}${fin?` <small>(${pts})</small>`:''}</span></td>`;
+        }).join('');
+        const label = fin?`<span class="pill pill-green" style="font-size:.65rem;">${j.realA}×${j.realB}</span>`:'';
+        const meta = [j.data, j.hora].filter(Boolean).join(' ');
+        return faseRow + `<tr><td style="white-space:nowrap;font-size:.8rem;">${meta?`<div style="font-size:.65rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;">${meta}</div>`:''}<strong>${FLAGS_GRUPOS[j.timeA]||''} ${j.timeA}</strong> ${label} <strong>${j.timeB} ${FLAGS_GRUPOS[j.timeB]||''}</strong></td>${cells}</tr>`;
+      }).join('');
+      c.innerHTML = `<div class="card"><div class="card-header"><h2>🏆 Palpites Mata-Mata</h2></div><div class="pal-scroll"><table class="pal-table"><thead><tr><th>Jogo</th>${hdr}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      return;
+    }
+
+    // ── PARTICIPANTE: cards com inputs editáveis ──
+    const player = state.participantes.find(p =>
+      p.nome.toLowerCase() === session.playerName?.toLowerCase());
+    if (!player) {
+      c.innerHTML = `<div class="empty" style="padding:30px;"><div class="eico">⚠️</div><p>Seu nome não foi encontrado. Peça ao organizador para te cadastrar.</p></div>`;
+      return;
+    }
+
+    let html = '';
+    let lastFaseP = null;
+
+    jogosMataOrdenados.forEach(j => {
       const fin = j.realA !== null && j.realA !== undefined;
       const fInfo = classificarFaseMataMata(j.fase);
       const mult = multiplicadorFase(j.fase);
+      const bloq = isJogoBloqueado(j);
 
       // Separador de fase
-      let faseRow = '';
-      if (fInfo && fInfo.label !== lastFase) {
-        lastFase = fInfo.label;
-        const multLabel = mult > 1 ? ` <span style="color:var(--green-light);font-size:.65rem;">×${mult}</span>` : '';
-        faseRow = `<tr><td colspan="${state.participantes.length + 1}" style="background:var(--bg4);padding:8px 10px;font-family:'Bebas Neue',sans-serif;font-size:.8rem;letter-spacing:1.5px;color:var(--gold-light);">${fInfo.label}${multLabel}</td></tr>`;
+      if (fInfo && fInfo.label !== lastFaseP) {
+        lastFaseP = fInfo.label;
+        html += `<div class="mm-fase-hdr">${fInfo.label} <span style="font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;font-weight:400;">×${mult} pontos</span></div>`;
       }
 
-      const cells = state.participantes.map(p => {
-        const pal = (state.palpites[j.id]||{})[p.id]||{};
-        if (pal.a===''||pal.a===undefined) return '<td style="color:var(--text-dim)">—</td>';
-        const pts = calcPontos(j, pal);
-        let cls = '';
-        if (fin) {
-          if (pts >= 5*mult) cls='acerto-5';
-          else if (pts >= 3*mult) cls='acerto-3';
-          else if (pts >= 2*mult) cls='acerto-2';
-          else if (pts > 0) cls='acerto-2';
-        }
-        return `<td><span class="${cls}">${pal.a}×${pal.b}${fin?` <small>(${pts})</small>`:''}</span></td>`;
-      }).join('');
+      // Separador de data
+      const pal = (state.palpites[j.id]||{})[player.id]||{};
+      const ga = pal.a !== undefined && pal.a !== '' ? pal.a : '';
+      const gb = pal.b !== undefined && pal.b !== '' ? pal.b : '';
+      const preench = ga !== '' && gb !== '';
+      const pts = preench && fin ? calcPontos(j, pal) : null;
+      let ptsCls='', ptsIcon='';
+      if(pts!==null){
+        if(pts>=5*mult){ptsCls='acerto-5';ptsIcon='⭐';}
+        else if(pts>=3*mult){ptsCls='acerto-3';ptsIcon='✅';}
+        else if(pts>=2*mult){ptsCls='acerto-2';ptsIcon='🟡';}
+        else if(pts===0&&fin){ptsIcon='❌';}
+      }
 
-      const label = fin?`<span class="pill pill-green" style="font-size:.65rem;">${j.realA}×${j.realB}</span>`:'';
-      const meta = [j.data, j.hora].filter(Boolean).join(' ');
-      const dataRow = `<tr><td style="white-space:nowrap;font-size:.8rem;">${meta?`<div style="font-size:.65rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;">${meta}</div>`:''}<strong>${FLAGS_GRUPOS[j.timeA]||''} ${j.timeA}</strong> ${label} <strong>${j.timeB} ${FLAGS_GRUPOS[j.timeB]||''}</strong></td>${cells}</tr>`;
-      return faseRow + dataRow;
-    }).join('');
+      const vencA = fin && j.realA > j.realB;
+      const vencB = fin && j.realB > j.realA;
 
-    c.innerHTML = `
-      <div class="card">
-        <div class="card-header"><h2>🏆 Palpites Mata-Mata</h2></div>
-        <div class="pal-scroll">
-          <table class="pal-table">
-            <thead><tr><th>Jogo</th>${hdr}</tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      </div>`;
+      html += `
+        <div class="pal-jogo-card ${preench?'pal-ok':''} ${fin?'pal-fin':''}">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            ${j.hora?`<span style="font-size:.72rem;font-weight:700;color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;">🕐 ${j.hora}</span><span style="font-size:.68rem;color:var(--text-dim);">•</span>`:''}
+            ${j.data?`<span style="font-size:.68rem;color:var(--text-dim);">${j.data}</span><span style="font-size:.68rem;color:var(--text-dim);">•</span>`:''}
+            <span style="font-size:.68rem;background:rgba(255,223,0,.15);color:var(--gold-light);border:1px solid rgba(255,223,0,.2);border-radius:4px;padding:1px 6px;font-family:'Barlow Condensed',sans-serif;">×${mult} pts</span>
+            ${bloq&&!fin?`<span style="font-size:.65rem;color:#ff8a8a;margin-left:auto;">🔒 Encerrado</span>`:''}
+          </div>
+          <div class="pal-jogo-grid">
+            <div class="pal-team ${vencA?'mm-winner':''}">${FLAGS_GRUPOS[j.timeA]||'🏳️'} ${j.timeA}</div>
+            <div class="pal-inputs">
+              ${fin
+                ? `<div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--gold-light);letter-spacing:2px;">${j.realA}–${j.realB}</div>`
+                : `<input type="number" class="pal-score ${ga!==''?'filled':''}"
+                    id="pi-${j.id}-a" value="${ga}" min="0" max="30" inputmode="numeric" placeholder="?"
+                    data-jid="${j.id}" data-lado="a" data-pid="${player.id}" data-r="mata"
+                    oninput="onPalInput(this)" onfocus="this.select()" ${bloq?'disabled':''}/>
+                  <span class="pal-sep">×</span>
+                  <input type="number" class="pal-score ${gb!==''?'filled':''}"
+                    id="pi-${j.id}-b" value="${gb}" min="0" max="30" inputmode="numeric" placeholder="?"
+                    data-jid="${j.id}" data-lado="b" data-pid="${player.id}" data-r="mata"
+                    oninput="onPalInput(this)" onfocus="this.select()" ${bloq?'disabled':''}/>
+                `}
+            </div>
+            <div class="pal-team right ${vencB?'mm-winner':''}">${j.timeB} ${FLAGS_GRUPOS[j.timeB]||'🏳️'}</div>
+          </div>
+          ${pts !== null ? `<div class="pal-pts-badge"><span class="${ptsCls}">${ptsIcon} ${pts} pts</span></div>` : ''}
+          ${renderOutrosPalpites(j, player.id)}
+        </div>`;
+    });
+
+    html += `<div style="height:80px;"></div>`;
+    c.innerHTML = html;
     return;
   }
 
