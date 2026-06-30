@@ -68,6 +68,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .p-del:active{background:rgba(230,57,70,.15)}
 /* jogo card */
 .jogo-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;border-left:3px solid transparent}
+.jogo-card.jogo-pendente{opacity:.55}
 .jogo-card.fim{border-left-color:var(--green-light)}
 .jogo-times{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:10px}
 .jogo-team{font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700}
@@ -1542,6 +1543,23 @@ async function salvarTodosPalpites(pid) {
   toast(`💾 ${salvos} palpites salvos!`);
 }
 
+async function salvarTodosPalpitesMata(pid) {
+  const jogosMata = state.jogos.filter(j => classificarFaseMataMata(j.fase));
+  const updates = {};
+  let salvos = 0;
+  jogosMata.forEach(j => {
+    const a = document.getElementById(`pi-${j.id}-a`)?.value ?? '';
+    const b = document.getElementById(`pi-${j.id}-b`)?.value ?? '';
+    if (a!==''&&b!=='') {
+      updates[`palpites/${j.id}/${pid}`] = { a:parseInt(a), b:parseInt(b) };
+      salvos++;
+    }
+  });
+  if (Object.keys(updates).length) await fbUpdate('', updates);
+  toast(`💾 ${salvos} palpite(s) do mata-mata salvos!`);
+}
+window.salvarTodosPalpitesMata = salvarTodosPalpitesMata;
+
 async function onBonusInput(el, campo, pid) {
   clearTimeout(palDebounce);
   palDebounce = setTimeout(async () => {
@@ -1553,6 +1571,19 @@ window.onPalInput   = onPalInput;
 window.salvarTodosPalpites = salvarTodosPalpites;
 
 function atualizarProgressoInline(pid, r) {
+  // Mata-mata tem seu próprio contador/barra
+  if (r === 'mata') {
+    const jogosMata = state.jogos.filter(j => classificarFaseMataMata(j.fase));
+    const doneM = jogosMata.filter(j => {
+      const a = document.getElementById(`pi-${j.id}-a`)?.value ?? '';
+      const b = document.getElementById(`pi-${j.id}-b`)?.value ?? '';
+      return a!==''&&b!=='';
+    }).length;
+    const lblM = document.getElementById('pal-salvar-lbl-mata');
+    if (lblM) lblM.textContent = `${doneM}/${jogosMata.length} preenchidos`;
+    return;
+  }
+
   const todos = state.jogos.length ? state.jogos : JOGOS_PADRAO;
   const jogosBase = todos.filter(j => !classificarFaseMataMata(j.fase));
   const total = jogosBase.length;
@@ -1841,8 +1872,9 @@ function calcRanking() {
       const pal=(state.palpites[j.id]||{})[p.id]||{};
       const pts=calcPontos(j,pal);
       total+=pts;
-      if(pts===5)exatos++;
-      if(pts>=2)vencedores++;
+      const mult = multiplicadorFase(j.fase);
+      if(pts===5*mult)exatos++;
+      if(pts>=2*mult)vencedores++;
     });
     const acCampeao=!!(state.campeaoReal&&p.campeao&&p.campeao.toLowerCase().trim()===state.campeaoReal.toLowerCase().trim());
     const acArtilheiro=!!(state.artilheiroReal&&p.artilheiro&&p.artilheiro.toLowerCase().trim()===state.artilheiroReal.toLowerCase().trim());
@@ -2277,6 +2309,124 @@ async function seedMataMata() {
   toast('✅ 16 jogos da Rodada de 32 atualizados!');
 }
 window.seedMataMata = seedMataMata;
+
+// ══════════════════════════════════════════
+// ÁRVORE ELIMINATÓRIA AUTOMÁTICA
+// (Oitavas → Quartas → Semifinal → Final / Disputa 3º Lugar)
+//
+// Gera/atualiza automaticamente os confrontos das fases seguintes à
+// Rodada de 32, com base nos vencedores dos jogos já cadastrados.
+// Não duplica jogos existentes, não sobrescreve resultados já lançados,
+// e atualiza os times de um confronto sempre que o vencedor da fase
+// anterior mudar (ex: admin corrige um placar).
+// ══════════════════════════════════════════
+
+// Definição da árvore: cada confronto da fase X aponta para os
+// IDs dos 2 jogos da fase anterior cujos vencedores se enfrentam.
+// Usa o mesmo padrão de IDs do seedMataMata (r32-1 .. r32-16).
+const ARVORE_MATA_MATA = {
+  oitavas: [
+    { id:'oit-1', fase:'Oitavas', de:['r32-1','r32-2']  },
+    { id:'oit-2', fase:'Oitavas', de:['r32-3','r32-4']  },
+    { id:'oit-3', fase:'Oitavas', de:['r32-5','r32-6']  },
+    { id:'oit-4', fase:'Oitavas', de:['r32-7','r32-8']  },
+    { id:'oit-5', fase:'Oitavas', de:['r32-9','r32-10'] },
+    { id:'oit-6', fase:'Oitavas', de:['r32-11','r32-12']},
+    { id:'oit-7', fase:'Oitavas', de:['r32-13','r32-14']},
+    { id:'oit-8', fase:'Oitavas', de:['r32-15','r32-16']},
+  ],
+  quartas: [
+    { id:'qua-1', fase:'Quartas', de:['oit-1','oit-2'] },
+    { id:'qua-2', fase:'Quartas', de:['oit-3','oit-4'] },
+    { id:'qua-3', fase:'Quartas', de:['oit-5','oit-6'] },
+    { id:'qua-4', fase:'Quartas', de:['oit-7','oit-8'] },
+  ],
+  semi: [
+    { id:'semi-1', fase:'Semifinal', de:['qua-1','qua-2'] },
+    { id:'semi-2', fase:'Semifinal', de:['qua-3','qua-4'] },
+  ],
+  final: [
+    { id:'final-1', fase:'Final', de:['semi-1','semi-2'], tipo:'vencedores' },
+  ],
+  terceiro: [
+    { id:'terceiro-1', fase:'Disputa 3º Lugar', de:['semi-1','semi-2'], tipo:'perdedores' },
+  ],
+};
+
+// Retorna { nome, definido } do vencedor (ou perdedor) de um jogo já cadastrado
+function resolverResultadoJogo(jogoId, tipo) {
+  const j = state.jogos.find(x => x.id === jogoId);
+  if (!j) return null;
+  if (!j.timeA || !j.timeB) return null; // confronto anterior ainda não definido
+  const fin = j.realA !== null && j.realA !== undefined;
+  if (!fin) return { nome: null, definido: false }; // times definidos mas sem resultado ainda
+  if (j.realA === j.realB) return { nome: null, definido: false, empate: true }; // mata-mata não pode empatar
+  const vencedorA = j.realA > j.realB;
+  if (tipo === 'perdedores') {
+    return { nome: vencedorA ? j.timeB : j.timeA, definido: true };
+  }
+  return { nome: vencedorA ? j.timeA : j.timeB, definido: true };
+}
+
+// Gera/atualiza os jogos de TODAS as fases seguintes à Rodada de 32
+// com base no estado atual dos resultados. Idempotente: pode ser
+// chamada quantas vezes for preciso (ex: a cada refresh) sem duplicar
+// nem sobrescrever resultados já lançados.
+async function avancarArvoreMataMata() {
+  if (session.role !== 'admin') return;
+
+  const updates = {};
+  let mudancas = 0;
+
+  // Processa em ordem: oitavas -> quartas -> semi -> final/terceiro
+  // (cada fase depende do resultado da anterior já estar no Firebase)
+  ['oitavas','quartas','semi','final','terceiro'].forEach(faseKey => {
+    ARVORE_MATA_MATA[faseKey].forEach(conf => {
+      const [origemA, origemB] = conf.de;
+      const tipo = conf.tipo === 'perdedores' ? 'perdedores' : 'vencedores';
+      const rA = resolverResultadoJogo(origemA, tipo);
+      const rB = resolverResultadoJogo(origemB, tipo);
+
+      const existente = state.jogos.find(x => x.id === conf.id);
+
+      // Monta os valores desejados para timeA/timeB (null = ainda "A definir")
+      const novoTimeA = rA?.nome || '';
+      const novoTimeB = rB?.nome || '';
+
+      if (!existente) {
+        // Cria o jogo só quando pelo menos um time já é conhecido,
+        // para não poluir o Firebase com confrontos 100% vazios
+        if (novoTimeA || novoTimeB) {
+          updates[`jogos/${conf.id}`] = {
+            id: conf.id, timeA: novoTimeA, timeB: novoTimeB,
+            data: '', hora: '', fase: conf.fase, realA: null, realB: null
+          };
+          mudancas++;
+        }
+      } else {
+        // Atualiza nomes dos times SOMENTE se mudaram e o jogo ainda
+        // não tem resultado lançado (preserva resultado já oficializado)
+        const jaTemResultado = existente.realA !== null && existente.realA !== undefined;
+        if (!jaTemResultado) {
+          if (existente.timeA !== novoTimeA) {
+            updates[`jogos/${conf.id}/timeA`] = novoTimeA;
+            mudancas++;
+          }
+          if (existente.timeB !== novoTimeB) {
+            updates[`jogos/${conf.id}/timeB`] = novoTimeB;
+            mudancas++;
+          }
+        }
+      }
+    });
+  });
+
+  if (mudancas > 0) {
+    await fbUpdate('', updates);
+  }
+  return mudancas;
+}
+window.avancarArvoreMataMata = avancarArvoreMataMata;
 
 function normTxt(s) {
   return (s||'').toLowerCase().trim()
@@ -3081,6 +3231,7 @@ function renderMataMataJogos(modo) {
       const fInfo = classificarFaseMataMata(j.fase);
       const mult = multiplicadorFase(j.fase);
       const bloq = isJogoBloqueado(j);
+      const timesDefinidos = !!(j.timeA && j.timeB);
 
       // Separador de fase
       if (fInfo && fInfo.label !== lastFaseP) {
@@ -3104,6 +3255,23 @@ function renderMataMataJogos(modo) {
 
       const vencA = fin && j.realA > j.realB;
       const vencB = fin && j.realB > j.realA;
+
+      // Jogo ainda sem os dois times definidos: mostra "A definir" e bloqueia palpite
+      if (!timesDefinidos) {
+        html += `
+          <div class="pal-jogo-card" style="opacity:.55;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+              <span style="font-size:.68rem;background:rgba(255,223,0,.1);color:var(--gold-light);border:1px solid rgba(255,223,0,.18);border-radius:4px;padding:1px 6px;font-family:'Barlow Condensed',sans-serif;">×${mult} pts</span>
+              <span style="font-size:.65rem;color:var(--text-dim);margin-left:auto;">⏳ Aguardando fase anterior</span>
+            </div>
+            <div class="pal-jogo-grid">
+              <div class="pal-team">${j.timeA ? `${FLAGS_GRUPOS[j.timeA]||'🏳️'} ${j.timeA}` : '<span style="color:var(--text-dim);font-style:italic;">A definir</span>'}</div>
+              <div class="pal-inputs"><div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--text-dim);">VS</div></div>
+              <div class="pal-team right">${j.timeB ? `${j.timeB} ${FLAGS_GRUPOS[j.timeB]||'🏳️'}` : '<span style="color:var(--text-dim);font-style:italic;">A definir</span>'}</div>
+            </div>
+          </div>`;
+        return;
+      }
 
       html += `
         <div class="pal-jogo-card ${preench?'pal-ok':''} ${fin?'pal-fin':''}">
@@ -3136,7 +3304,20 @@ function renderMataMataJogos(modo) {
         </div>`;
     });
 
-    html += `<div style="height:80px;"></div>`;
+    // Barra fixa de salvar
+    const totalMata = jogosMataOrdenados.length;
+    const preenchidosMata = jogosMataOrdenados.filter(j => {
+      const pal = (state.palpites[j.id]||{})[player.id]||{};
+      return pal.a !== undefined && pal.a !== '' && pal.b !== undefined && pal.b !== '';
+    }).length;
+
+    html += `
+      <div class="pal-salvar-bar">
+        <div class="pal-salvar-lbl" id="pal-salvar-lbl-mata">${preenchidosMata}/${totalMata} preenchidos</div>
+        <button class="btn btn-gold btn-sm" onclick="salvarTodosPalpitesMata('${player.id}')">💾 Salvar tudo</button>
+      </div>
+      <div style="height:16px;"></div>`;
+
     c.innerHTML = html;
     return;
   }
@@ -3183,6 +3364,7 @@ function renderMataMataJogos(modo) {
     let lastData = null;
     jogsFase.forEach(j => {
       const fin = j.realA !== null && j.realA !== undefined;
+      const timesDefinidos = !!(j.timeA && j.timeB);
       // Separador de data
       if (j.data && j.data !== lastData) {
         lastData = j.data;
@@ -3190,23 +3372,24 @@ function renderMataMataJogos(modo) {
       }
       // Usa o mesmo layout de jogo-card da fase de grupos
       html += `
-        <div class="jogo-card ${fin?'fim':''} ${fase.id==='final'?'jogo-final':''}">
+        <div class="jogo-card ${fin?'fim':''} ${fase.id==='final'?'jogo-final':''} ${!timesDefinidos?'jogo-pendente':''}">
           <div class="jogo-meta">
             ${j.hora?`<span style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.75rem;">${j.hora}</span>`:''}
             ${j.fase?`<span class="fase-badge" style="background:rgba(255,223,0,.15);color:var(--gold-light);">${j.fase}</span>`:''}
+            ${!timesDefinidos?`<span style="font-size:.65rem;color:var(--text-dim);margin-left:auto;">⏳ Aguardando fase anterior</span>`:''}
           </div>
           <div class="jogo-times">
-            <div class="jogo-team">${FLAGS_GRUPOS[j.timeA]||'🏳️'} ${j.timeA}</div>
+            <div class="jogo-team">${j.timeA ? `${FLAGS_GRUPOS[j.timeA]||'🏳️'} ${j.timeA}` : '<span style="color:var(--text-dim);font-style:italic;">A definir</span>'}</div>
             <div>${fin?`<div class="jogo-placar">${j.realA}–${j.realB}</div>`:`<div class="jogo-vs">VS</div>`}</div>
-            <div class="jogo-team right">${j.timeB} ${FLAGS_GRUPOS[j.timeB]||'🏳️'}</div>
+            <div class="jogo-team right">${j.timeB ? `${j.timeB} ${FLAGS_GRUPOS[j.timeB]||'🏳️'}` : '<span style="color:var(--text-dim);font-style:italic;">A definir</span>'}</div>
           </div>
           <div class="jogo-btns">
-            ${isAdmin?`<button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openResultModal('${j.id}')">⚽ ${fin?'Editar':'Resultado'}</button>`:''}
-            <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openPalpiteModal('${j.id}')">🎯 Palpite</button>
+            ${isAdmin?`<button class="btn btn-ghost btn-sm" style="flex:1;" ${!timesDefinidos?'disabled':''} onclick="openResultModal('${j.id}')">⚽ ${fin?'Editar':'Resultado'}</button>`:''}
+            <button class="btn btn-ghost btn-sm" style="flex:1;" ${!timesDefinidos?'disabled':''} onclick="openPalpiteModal('${j.id}')">🎯 Palpite</button>
             ${isAdmin?`<button class="btn btn-danger btn-sm" onclick="removeJogo('${j.id}')">✕</button>`:''}
           </div>
           ${isAdmin?`<div class="confirm-box" id="confirm-j-${j.id}">
-            <div class="confirm-msg">Remover <strong>${j.timeA} × ${j.timeB}</strong>?</div>
+            <div class="confirm-msg">Remover <strong>${j.timeA||'?'} × ${j.timeB||'?'}</strong>?</div>
             <div class="confirm-btns">
               <button class="btn btn-danger btn-sm" onclick="confirmRemoveJ('${j.id}')">🗑 Remover</button>
               <button class="btn btn-ghost btn-sm" onclick="removeJogo('${j.id}')">Cancelar</button>
@@ -3413,6 +3596,9 @@ function _renderOutrosMM(j) {
   </details>`;
 }
 
+let _arvoreMataMataEmAndamento = false;
+let _ultimoHashResultadosMata = '';
+
 function refresh(){
   renderParticipantes();
   renderJogos();
@@ -3424,6 +3610,20 @@ function refresh(){
   if (copaSubtab === 'classificados') renderClassificados();
   if (palSubtab === 'mata') renderMataMataJogos('pal');
   if (jogSubtab === 'mata') renderMataMataJogos('jog');
+
+  // Avança a árvore do mata-mata automaticamente (somente admin, e só
+  // quando os resultados realmente mudaram, para evitar updates redundantes)
+  if (session.role === 'admin' && !_arvoreMataMataEmAndamento) {
+    const hashAtual = state.jogos
+      .filter(j => classificarFaseMataMata(j.fase))
+      .map(j => `${j.id}:${j.realA}:${j.realB}:${j.timeA}:${j.timeB}`)
+      .sort().join('|');
+    if (hashAtual !== _ultimoHashResultadosMata) {
+      _ultimoHashResultadosMata = hashAtual;
+      _arvoreMataMataEmAndamento = true;
+      avancarArvoreMataMata().finally(() => { _arvoreMataMataEmAndamento = false; });
+    }
+  }
 }
 
 // ══════════════════════════════════════════
