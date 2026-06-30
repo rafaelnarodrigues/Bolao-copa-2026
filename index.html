@@ -423,19 +423,33 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <div id="tab-palpites" class="section">
   <div class="sec-title" id="pal-section-title">Palpites</div>
   <div class="grupos-tabs" style="margin-bottom:14px;" id="pal-subtabs">
-    <button class="grupo-tab-btn active" id="pal-sub-grupos-btn" onclick="showPalSubtab('grupos')">⚽ Fase de Grupos</button>
-    <button class="grupo-tab-btn" id="pal-sub-mata-btn" onclick="showPalSubtab('mata')">🏆 Mata-Mata</button>
+    <button class="grupo-tab-btn active" id="pal-sub-grupos-btn" onclick="showPalSubtab('grupos')">⚽ Grupos</button>
+    <button class="grupo-tab-btn" id="pal-sub-r32-btn" onclick="showPalSubtab('r32')">🎯 16avos</button>
+    <button class="grupo-tab-btn" id="pal-sub-oitavas-btn" onclick="showPalSubtab('oitavas')">🏅 Oitavas</button>
+    <button class="grupo-tab-btn" id="pal-sub-quartas-btn" onclick="showPalSubtab('quartas')">🥈 Quartas</button>
+    <button class="grupo-tab-btn" id="pal-sub-semi-btn" onclick="showPalSubtab('semi')">🥉 Semis</button>
+    <button class="grupo-tab-btn" id="pal-sub-final-btn" onclick="showPalSubtab('final')">🏆 Final</button>
   </div>
   <div id="pal-content"></div>
-  <div id="pal-mata-content" style="display:none;"></div>
+  <div id="pal-mata-content" style="display:none;">
+    <div id="pal-mata-content-r32" style="display:none;"></div>
+    <div id="pal-mata-content-oitavas" style="display:none;"></div>
+    <div id="pal-mata-content-quartas" style="display:none;"></div>
+    <div id="pal-mata-content-semi" style="display:none;"></div>
+    <div id="pal-mata-content-final" style="display:none;"></div>
+  </div>
 </div>
 
 <!-- JOGOS (admin only) -->
 <div id="tab-jogos" class="section">
   <div class="sec-title">Jogos</div>
   <div class="grupos-tabs" style="margin-bottom:14px;">
-    <button class="grupo-tab-btn active" id="jog-sub-grupos-btn" onclick="showJogSubtab('grupos')">⚽ Fase de Grupos</button>
-    <button class="grupo-tab-btn" id="jog-sub-mata-btn" onclick="showJogSubtab('mata')">🏆 Mata-Mata</button>
+    <button class="grupo-tab-btn active" id="jog-sub-grupos-btn" onclick="showJogSubtab('grupos')">⚽ Grupos</button>
+    <button class="grupo-tab-btn" id="jog-sub-r32-btn" onclick="showJogSubtab('r32')">🎯 16avos</button>
+    <button class="grupo-tab-btn" id="jog-sub-oitavas-btn" onclick="showJogSubtab('oitavas')">🏅 Oitavas</button>
+    <button class="grupo-tab-btn" id="jog-sub-quartas-btn" onclick="showJogSubtab('quartas')">🥈 Quartas</button>
+    <button class="grupo-tab-btn" id="jog-sub-semi-btn" onclick="showJogSubtab('semi')">🥉 Semis</button>
+    <button class="grupo-tab-btn" id="jog-sub-final-btn" onclick="showJogSubtab('final')">🏆 Final</button>
   </div>
 
   <!-- SUB: GRUPOS -->
@@ -463,17 +477,37 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
   </div>
 
-  <!-- SUB: MATA-MATA -->
-  <div id="jog-sub-mata" style="display:none;">
+  <!-- SUB: 16AVOS (Rodada de 32) -->
+  <div id="jog-sub-r32" style="display:none;">
     <div class="card" style="margin-bottom:12px;">
       <div class="card-body">
         <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:10px;line-height:1.6;">
           Cadastra automaticamente os 16 jogos da Rodada de 32 com datas e horários oficiais da FIFA. Jogos já cadastrados não são duplicados.
         </div>
-        <button class="btn btn-gold btn-full" onclick="seedMataMata()">⚡ Cadastrar Rodada de 32 no Firebase</button>
+        <button class="btn btn-gold btn-full" onclick="seedMataMata()">⚡ Cadastrar 16avos no Firebase</button>
       </div>
     </div>
-    <div id="jog-mata-content"></div>
+    <div id="jog-mata-content-r32"></div>
+  </div>
+
+  <!-- SUB: OITAVAS -->
+  <div id="jog-sub-oitavas" style="display:none;">
+    <div id="jog-mata-content-oitavas"></div>
+  </div>
+
+  <!-- SUB: QUARTAS -->
+  <div id="jog-sub-quartas" style="display:none;">
+    <div id="jog-mata-content-quartas"></div>
+  </div>
+
+  <!-- SUB: SEMIS -->
+  <div id="jog-sub-semi" style="display:none;">
+    <div id="jog-mata-content-semi"></div>
+  </div>
+
+  <!-- SUB: FINAL + 3º LUGAR -->
+  <div id="jog-sub-final" style="display:none;">
+    <div id="jog-mata-content-final"></div>
   </div>
 </div>
 
@@ -3056,23 +3090,42 @@ function renderBracket() {
 let palSubtab = 'grupos';
 let jogSubtab = 'grupos';
 
+// Mapeia cada aba para a(s) fase(s) de mata-mata que ela exibe
+const MM_ABA_FASES = {
+  r32:     ['🎯 Rodada de 32'],
+  oitavas: ['🏅 Oitavas de Final'],
+  quartas: ['🥈 Quartas de Final'],
+  semi:    ['🥉 Semifinal'],
+  final:   ['🏆 Final', '🟤 Disputa 3º Lugar'],
+};
+const MM_ABAS = ['r32','oitavas','quartas','semi','final'];
+
 function showPalSubtab(tab) {
   palSubtab = tab;
+  const isMata = MM_ABAS.includes(tab);
   document.getElementById('pal-content').style.display = tab === 'grupos' ? '' : 'none';
-  document.getElementById('pal-mata-content').style.display = tab === 'mata' ? '' : 'none';
+  document.getElementById('pal-mata-content').style.display = isMata ? '' : 'none';
   document.getElementById('pal-sub-grupos-btn').classList.toggle('active', tab === 'grupos');
-  document.getElementById('pal-sub-mata-btn').classList.toggle('active', tab === 'mata');
-  if (tab === 'mata') renderMataMataJogos('pal');
+  MM_ABAS.forEach(a => {
+    document.getElementById(`pal-sub-${a}-btn`).classList.toggle('active', tab === a);
+    const el = document.getElementById(`pal-mata-content-${a}`);
+    if (el) el.style.display = tab === a ? '' : 'none';
+  });
+  if (isMata) renderMataMataJogos('pal', tab);
 }
 window.showPalSubtab = showPalSubtab;
 
 function showJogSubtab(tab) {
   jogSubtab = tab;
+  const isMata = MM_ABAS.includes(tab);
   document.getElementById('jog-sub-grupos').style.display = tab === 'grupos' ? '' : 'none';
-  document.getElementById('jog-sub-mata').style.display = tab === 'mata' ? '' : 'none';
   document.getElementById('jog-sub-grupos-btn').classList.toggle('active', tab === 'grupos');
-  document.getElementById('jog-sub-mata-btn').classList.toggle('active', tab === 'mata');
-  if (tab === 'mata') renderMataMataJogos('jog');
+  MM_ABAS.forEach(a => {
+    document.getElementById(`jog-sub-${a}-btn`).classList.toggle('active', tab === a);
+    const el = document.getElementById(`jog-sub-${a}`);
+    if (el) el.style.display = tab === a ? '' : 'none';
+  });
+  if (isMata) renderMataMataJogos('jog', tab);
 }
 window.showJogSubtab = showJogSubtab;
 
