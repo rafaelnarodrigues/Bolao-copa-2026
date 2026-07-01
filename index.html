@@ -969,15 +969,36 @@ function initApp() {
 // ══════════════════════════════════════════
 async function fbSet(path, value) {
   setSyncStatus('spin');
-  await set(ref(db, `${session.bolaoId}/${path}`), value);
+  try {
+    await set(ref(db, `${session.bolaoId}/${path}`), value);
+    setSyncStatus('ok');
+  } catch (err) {
+    setSyncStatus('err');
+    console.error('fbSet falhou:', path, err);
+    throw err;
+  }
 }
 async function fbUpdate(path, updates) {
   setSyncStatus('spin');
-  await update(ref(db, `${session.bolaoId}/${path}`), updates);
+  try {
+    await update(ref(db, `${session.bolaoId}/${path}`), updates);
+    setSyncStatus('ok');
+  } catch (err) {
+    setSyncStatus('err');
+    console.error('fbUpdate falhou:', path, err);
+    throw err;
+  }
 }
 async function fbRemove(path) {
   setSyncStatus('spin');
-  await remove(ref(db, `${session.bolaoId}/${path}`));
+  try {
+    await remove(ref(db, `${session.bolaoId}/${path}`));
+    setSyncStatus('ok');
+  } catch (err) {
+    setSyncStatus('err');
+    console.error('fbRemove falhou:', path, err);
+    throw err;
+  }
 }
 
 // ══════════════════════════════════════════
@@ -2425,6 +2446,68 @@ function resolverResultadoJogo(jogoId, tipo) {
 // (realA/realB), apenas propaga o NOME dos times vencedores/perdedores
 // para o próximo confronto. Isso evita que a árvore só avance quando o
 // admin estiver com o app aberto no exato momento em que lança o placar.
+// ══════════════════════════════════════════
+// CÁLCULO LOCAL DA ÁRVORE (sem depender de escrita no Firebase)
+// ══════════════════════════════════════════
+// Calcula, inteiramente em memória a partir do state.jogos já carregado,
+// quais deveriam ser os times de cada confronto das fases seguintes à
+// Rodada de 32. Isso serve como camada de exibição independente de
+// qualquer gravação no Firebase — funciona mesmo que a sessão atual não
+// tenha permissão de escrita em /jogos (ex: regras do Firebase restritas
+// ao admin), garantindo que TODO participante veja os confrontos corretos
+// assim que os resultados anteriores estiverem disponíveis via onValue.
+function calcularArvoreLocal() {
+  const mapa = {}; // jogoId -> { timeA, timeB }
+  ['oitavas','quartas','semi','final','terceiro'].forEach(faseKey => {
+    ARVORE_MATA_MATA[faseKey].forEach(conf => {
+      const [origemA, origemB] = conf.de;
+      const tipo = conf.tipo === 'perdedores' ? 'perdedores' : 'vencedores';
+      const rA = resolverResultadoJogo(origemA, tipo);
+      const rB = resolverResultadoJogo(origemB, tipo);
+      mapa[conf.id] = { timeA: rA?.nome || '', timeB: rB?.nome || '', fase: conf.fase };
+    });
+  });
+  return mapa;
+}
+
+// Retorna a lista de jogos de mata-mata "efetivos" para exibição: usa o
+// jogo real do Firebase quando existir e já tiver pelo menos um time
+// definido; caso contrário, usa o confronto calculado localmente (com
+// data/hora vazias, pois ainda não foram cadastradas pelo admin).
+function jogosMataMataEfetivos() {
+  const local = calcularArvoreLocal();
+  const porId = {};
+
+  // Começa com os jogos reais do Firebase
+  state.jogos
+    .filter(j => classificarFaseMataMata(j.fase))
+    .forEach(j => { porId[j.id] = j; });
+
+  // Preenche/complementa com o cálculo local para IDs conhecidos da árvore
+  Object.keys(local).forEach(id => {
+    const calc = local[id];
+    const existente = porId[id];
+    if (!existente) {
+      // Jogo ainda não existe no Firebase: usa o calculado, se tiver algum time
+      if (calc.timeA || calc.timeB) {
+        porId[id] = { id, timeA: calc.timeA, timeB: calc.timeB, data:'', hora:'', fase: calc.fase, realA: null, realB: null };
+      }
+    } else {
+      // Jogo existe mas ainda sem resultado: garante que os nomes dos
+      // times estejam atualizados mesmo que o Firebase ainda não tenha
+      // recebido a escrita mais recente (proteção contra falha de permissão)
+      const jaTemResultado = existente.realA !== null && existente.realA !== undefined;
+      if (!jaTemResultado) {
+        if ((calc.timeA && existente.timeA !== calc.timeA) || (calc.timeB && existente.timeB !== calc.timeB)) {
+          porId[id] = { ...existente, timeA: calc.timeA || existente.timeA, timeB: calc.timeB || existente.timeB };
+        }
+      }
+    }
+  });
+
+  return Object.values(porId);
+}
+
 async function avancarArvoreMataMata() {
   if (session.role !== 'admin' && session.role !== 'player') return 0;
 
@@ -3233,9 +3316,12 @@ function renderMataMataJogos(modo, aba) {
     const isAdminPal = session.role === 'admin';
 
     // Coleta jogos da aba selecionada, sem duplicatas
+    // Usa jogosMataMataEfetivos() em vez de state.jogos diretamente para
+    // que os confrontos apareçam mesmo se a escrita no Firebase ainda não
+    // tiver sido concluída (ex: sessão sem permissão de escrita)
     const jogosMataOrdenados = [];
     const vistosP = new Set();
-    state.jogos
+    jogosMataMataEfetivos()
       .filter(pertenceAba)
       .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'))
       .forEach(j => {
@@ -3396,10 +3482,12 @@ function renderMataMataJogos(modo, aba) {
   const isAdmin = session.role === 'admin';
 
   // Agrupa jogos da aba selecionada por fase, deduplicando por par de times
+  // Usa jogosMataMataEfetivos() para exibir confrontos calculados mesmo
+  // que ainda não tenham sido persistidos no Firebase
   const jogosMata = {};
   const vistos = new Set(); // evita duplicatas pelo par timeA+timeB
 
-  state.jogos
+  jogosMataMataEfetivos()
     .filter(pertenceAba)
     .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'))
     .forEach(j => {
