@@ -2420,8 +2420,13 @@ function resolverResultadoJogo(jogoId, tipo) {
 // com base no estado atual dos resultados. Idempotente: pode ser
 // chamada quantas vezes for preciso (ex: a cada refresh) sem duplicar
 // nem sobrescrever resultados já lançados.
+// Qualquer sessão logada (admin ou participante) pode disparar esta
+// atualização — é uma operação segura, pois nunca grava um resultado
+// (realA/realB), apenas propaga o NOME dos times vencedores/perdedores
+// para o próximo confronto. Isso evita que a árvore só avance quando o
+// admin estiver com o app aberto no exato momento em que lança o placar.
 async function avancarArvoreMataMata() {
-  if (session.role !== 'admin') return;
+  if (session.role !== 'admin' && session.role !== 'player') return 0;
 
   const updates = {};
   let mudancas = 0;
@@ -3677,9 +3682,12 @@ function refresh(){
   if (MM_ABAS.includes(palSubtab)) renderMataMataJogos('pal', palSubtab);
   if (MM_ABAS.includes(jogSubtab)) renderMataMataJogos('jog', jogSubtab);
 
-  // Avança a árvore do mata-mata automaticamente (somente admin, e só
-  // quando os resultados realmente mudaram, para evitar updates redundantes)
-  if (session.role === 'admin' && !_arvoreMataMataEmAndamento) {
+  // Avança a árvore do mata-mata automaticamente. Roda em QUALQUER sessão
+  // logada (admin ou participante) — é seguro porque avancarArvoreMataMata()
+  // nunca grava um resultado, só propaga o NOME do time vencedor/perdedor
+  // para o próximo confronto quando ainda está vazio. Isso evita que a
+  // árvore fique travada esperando o admin reabrir o app.
+  if (!_arvoreMataMataEmAndamento && (session.role === 'admin' || session.role === 'player')) {
     const hashAtual = state.jogos
       .filter(j => classificarFaseMataMata(j.fase))
       .map(j => `${j.id}:${j.realA}:${j.realB}:${j.timeA}:${j.timeB}`)
