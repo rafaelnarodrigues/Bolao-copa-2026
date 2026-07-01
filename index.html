@@ -1609,7 +1609,10 @@ async function salvarTodosPalpites(pid) {
 }
 
 async function salvarTodosPalpitesMata(pid) {
-  const jogosMata = state.jogos.filter(j => classificarFaseMataMata(j.fase));
+  // Usa jogosMataMataEfetivos() para incluir também os jogos calculados
+  // localmente (com IDs sintéticos como oit-2) que ainda não foram
+  // persistidos no Firebase, mas já têm inputs de palpite na tela
+  const jogosMata = jogosMataMataEfetivos();
   const updates = {};
   let salvos = 0;
   jogosMata.forEach(j => {
@@ -1639,7 +1642,7 @@ function atualizarProgressoInline(pid, r) {
   // Mata-mata tem seu próprio contador/barra, por aba/fase ativa
   if (r === 'mata') {
     const fasesAba = MM_ABA_FASES[palSubtab] || [];
-    const jogosMata = state.jogos.filter(j => {
+    const jogosMata = jogosMataMataEfetivos().filter(j => {
       const fInfo = classificarFaseMataMata(j.fase);
       return fInfo && fasesAba.includes(fInfo.label);
     });
@@ -3119,7 +3122,11 @@ function renderBracket() {
   const c = document.getElementById('bracket-content');
   if (!c) return;
 
-  const jogosBase = state.jogos.length ? state.jogos : [];
+  // Usa jogosMataMataEfetivos() em vez de state.jogos diretamente para
+  // que os confrontos calculados localmente (Oitavas, Quartas, etc.)
+  // apareçam mesmo que a escrita no Firebase ainda não tenha sido
+  // concluída para a sessão atual
+  const jogosBase = jogosMataMataEfetivos();
 
   // Agrupa jogos de mata-mata por fase
   const porFase = {};
