@@ -824,6 +824,16 @@ let unsubscribe = null; // Firebase listener
 let copaSubtab = 'grupos'; // sub-aba ativa em "Copa do Mundo": 'grupos' | 'mata'
 let grupoSelecionado = null; // grupo A-L selecionado na tabela
 
+// Mapeia cada aba de mata-mata para a(s) fase(s) que ela exibe
+const MM_ABA_FASES = {
+  r32:     ['🎯 Rodada de 32'],
+  oitavas: ['🏅 Oitavas de Final'],
+  quartas: ['🥈 Quartas de Final'],
+  semi:    ['🥉 Semifinal'],
+  final:   ['🏆 Final', '🟤 Disputa 3º Lugar'],
+};
+const MM_ABAS = ['r32','oitavas','quartas','semi','final'];
+
 // ══════════════════════════════════════════
 // SETUP FLOW
 // ══════════════════════════════════════════
@@ -1605,15 +1615,19 @@ window.onPalInput   = onPalInput;
 window.salvarTodosPalpites = salvarTodosPalpites;
 
 function atualizarProgressoInline(pid, r) {
-  // Mata-mata tem seu próprio contador/barra
+  // Mata-mata tem seu próprio contador/barra, por aba/fase ativa
   if (r === 'mata') {
-    const jogosMata = state.jogos.filter(j => classificarFaseMataMata(j.fase));
+    const fasesAba = MM_ABA_FASES[palSubtab] || [];
+    const jogosMata = state.jogos.filter(j => {
+      const fInfo = classificarFaseMataMata(j.fase);
+      return fInfo && fasesAba.includes(fInfo.label);
+    });
     const doneM = jogosMata.filter(j => {
       const a = document.getElementById(`pi-${j.id}-a`)?.value ?? '';
       const b = document.getElementById(`pi-${j.id}-b`)?.value ?? '';
       return a!==''&&b!=='';
     }).length;
-    const lblM = document.getElementById('pal-salvar-lbl-mata');
+    const lblM = document.getElementById(`pal-salvar-lbl-mata-${palSubtab}`);
     if (lblM) lblM.textContent = `${doneM}/${jogosMata.length} preenchidos`;
     return;
   }
@@ -3090,16 +3104,6 @@ function renderBracket() {
 let palSubtab = 'grupos';
 let jogSubtab = 'grupos';
 
-// Mapeia cada aba para a(s) fase(s) de mata-mata que ela exibe
-const MM_ABA_FASES = {
-  r32:     ['🎯 Rodada de 32'],
-  oitavas: ['🏅 Oitavas de Final'],
-  quartas: ['🥈 Quartas de Final'],
-  semi:    ['🥉 Semifinal'],
-  final:   ['🏆 Final', '🟤 Disputa 3º Lugar'],
-};
-const MM_ABAS = ['r32','oitavas','quartas','semi','final'];
-
 function showPalSubtab(tab) {
   palSubtab = tab;
   const isMata = MM_ABAS.includes(tab);
@@ -3206,20 +3210,28 @@ function resolverTimeR32(slot, classif) {
   return { nome: candidatos[0].nome, definido: false, grupos: slot.grps };
 }
 
-function renderMataMataJogos(modo) {
-  const containerId = modo === 'pal' ? 'pal-mata-content' : 'jog-mata-content';
+function renderMataMataJogos(modo, aba) {
+  aba = aba || 'r32';
+  const fasesAba = MM_ABA_FASES[aba] || [];
+  const containerId = modo === 'pal' ? `pal-mata-content-${aba}` : `jog-mata-content-${aba}`;
   const c = document.getElementById(containerId);
   if (!c) return;
+
+  // Filtro: só jogos cuja fase pertence à aba selecionada
+  const pertenceAba = j => {
+    const fInfo = classificarFaseMataMata(j.fase);
+    return fInfo && fasesAba.includes(fInfo.label);
+  };
 
   // ── MODO PAL: tabela igual à fase de grupos ──────────────
   if (modo === 'pal') {
     const isAdminPal = session.role === 'admin';
 
-    // Coleta jogos de mata-mata sem duplicatas
+    // Coleta jogos da aba selecionada, sem duplicatas
     const jogosMataOrdenados = [];
     const vistosP = new Set();
     state.jogos
-      .filter(j => classificarFaseMataMata(j.fase))
+      .filter(pertenceAba)
       .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'))
       .forEach(j => {
         const pk = [normTxt(j.timeA||''), normTxt(j.timeB||'')].sort().join('|');
@@ -3229,7 +3241,7 @@ function renderMataMataJogos(modo) {
       });
 
     if (!jogosMataOrdenados.length) {
-      c.innerHTML = `<div class="empty" style="padding:30px;"><div class="eico">🏆</div><p>Nenhum jogo do mata-mata cadastrado ainda.</p></div>`;
+      c.innerHTML = `<div class="empty" style="padding:30px;"><div class="eico">🏆</div><p>Nenhum jogo cadastrado nesta fase ainda.</p></div>`;
       return;
     }
 
@@ -3366,7 +3378,7 @@ function renderMataMataJogos(modo) {
 
     html += `
       <div class="pal-salvar-bar">
-        <div class="pal-salvar-lbl" id="pal-salvar-lbl-mata">${preenchidosMata}/${totalMata} preenchidos</div>
+        <div class="pal-salvar-lbl" id="pal-salvar-lbl-mata-${aba}">${preenchidosMata}/${totalMata} preenchidos</div>
         <button class="btn btn-gold btn-sm" onclick="salvarTodosPalpitesMata('${player.id}')">💾 Salvar tudo</button>
       </div>
       <div style="height:16px;"></div>`;
@@ -3378,12 +3390,12 @@ function renderMataMataJogos(modo) {
   // ── MODO JOG: cards com editar/palpite (admin) ──────────
   const isAdmin = session.role === 'admin';
 
-  // Agrupa jogos de mata-mata por fase, deduplicando por par de times
+  // Agrupa jogos da aba selecionada por fase, deduplicando por par de times
   const jogosMata = {};
   const vistos = new Set(); // evita duplicatas pelo par timeA+timeB
 
   state.jogos
-    .filter(j => classificarFaseMataMata(j.fase))
+    .filter(pertenceAba)
     .sort((a,b) => parseDataHora(a.data||'',a.hora||'00:00') - parseDataHora(b.data||'',b.hora||'00:00'))
     .forEach(j => {
       const fInfo = classificarFaseMataMata(j.fase);
@@ -3399,8 +3411,9 @@ function renderMataMataJogos(modo) {
   if (!temAlgumJogo) {
     c.innerHTML = `<div class="empty" style="padding:30px 16px;">
       <div class="eico">🏆</div>
-      <p>Nenhum jogo do mata-mata cadastrado ainda.</p>
-      ${isAdmin ? '<p style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Use o botão acima para cadastrar a Rodada de 32.</p>' : ''}
+      <p>Nenhum jogo cadastrado nesta fase ainda.</p>
+      ${isAdmin && aba==='r32' ? '<p style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Use o botão acima para cadastrar os 16avos.</p>' : ''}
+      ${isAdmin && aba!=='r32' ? '<p style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Os confrontos aparecem automaticamente conforme a fase anterior for concluída.</p>' : ''}
     </div>`;
     return;
   }
@@ -3661,8 +3674,8 @@ function refresh(){
   renderGrupos();
   if (copaSubtab === 'mata') renderBracket();
   if (copaSubtab === 'classificados') renderClassificados();
-  if (palSubtab === 'mata') renderMataMataJogos('pal');
-  if (jogSubtab === 'mata') renderMataMataJogos('jog');
+  if (MM_ABAS.includes(palSubtab)) renderMataMataJogos('pal', palSubtab);
+  if (MM_ABAS.includes(jogSubtab)) renderMataMataJogos('jog', jogSubtab);
 
   // Avança a árvore do mata-mata automaticamente (somente admin, e só
   // quando os resultados realmente mudaram, para evitar updates redundantes)
