@@ -1108,16 +1108,29 @@ function openResultModal(jid) {
   if (session.role !== 'admin') return;
   const j = state.jogos.find(x => x.id === jid);
   if (!j) return;
+  const isMataMata = !!classificarFaseMataMata(j.fase);
+  const empatouAtual = j.realA !== null && j.realA !== undefined && j.realA === j.realB;
   document.getElementById('mres-title').textContent = `${j.timeA} × ${j.timeB}`;
   document.getElementById('mres-body').innerHTML = `
-    <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:14px;">Informe o placar oficial:</div>
+    <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:14px;">Informe o placar oficial (tempo normal/prorrogação):</div>
     <div class="placar-row">
       <div style="text-align:center;"><div style="font-family:'Barlow Condensed',sans-serif;font-size:.8rem;color:var(--text-dim);margin-bottom:4px;">${j.timeA}</div>
-        <input type="number" class="placar-input" id="res-a" value="${j.realA??''}" min="0" max="30" inputmode="numeric" placeholder="0"/></div>
+        <input type="number" class="placar-input" id="res-a" value="${j.realA??''}" min="0" max="30" inputmode="numeric" placeholder="0" oninput="togglePenaltisInput()"/></div>
       <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:var(--text-dim);margin-top:16px;">×</div>
       <div style="text-align:center;"><div style="font-family:'Barlow Condensed',sans-serif;font-size:.8rem;color:var(--text-dim);margin-bottom:4px;">${j.timeB}</div>
-        <input type="number" class="placar-input" id="res-b" value="${j.realB??''}" min="0" max="30" inputmode="numeric" placeholder="0"/></div>
+        <input type="number" class="placar-input" id="res-b" value="${j.realB??''}" min="0" max="30" inputmode="numeric" placeholder="0" oninput="togglePenaltisInput()"/></div>
     </div>
+    ${isMataMata ? `
+    <div id="penaltis-box" style="display:${empatouAtual?'block':'none'};margin-top:14px;padding:12px;background:rgba(255,223,0,.06);border:1px solid rgba(255,223,0,.2);border-radius:10px;">
+      <div style="font-size:.78rem;color:var(--gold-light);margin-bottom:10px;">⚽ Empate no tempo normal — quem venceu nos pênaltis?</div>
+      <div class="placar-row">
+        <div style="text-align:center;"><div style="font-size:.72rem;color:var(--text-dim);margin-bottom:4px;">${j.timeA}</div>
+          <input type="number" class="placar-input" id="res-pen-a" value="${j.penA??''}" min="0" max="20" inputmode="numeric" placeholder="0"/></div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;color:var(--text-dim);margin-top:12px;">×</div>
+        <div style="text-align:center;"><div style="font-size:.72rem;color:var(--text-dim);margin-bottom:4px;">${j.timeB}</div>
+          <input type="number" class="placar-input" id="res-pen-b" value="${j.penB??''}" min="0" max="20" inputmode="numeric" placeholder="0"/></div>
+      </div>
+    </div>` : ''}
     <button class="btn btn-gold btn-full" style="margin-top:14px;" onclick="saveResultado('${jid}')">✅ Salvar Resultado</button>
     ${j.realA!==null?`<button class="btn btn-danger btn-full" style="margin-top:8px;" onclick="clearResultado('${jid}')">🗑 Limpar</button>`:''}
     <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="closeModal('modal-resultado')">Fechar</button>`;
@@ -1125,18 +1138,52 @@ function openResultModal(jid) {
 }
 window.openResultModal = openResultModal;
 
+function togglePenaltisInput() {
+  const a = parseInt(document.getElementById('res-a')?.value);
+  const b = parseInt(document.getElementById('res-b')?.value);
+  const box = document.getElementById('penaltis-box');
+  if (!box) return;
+  box.style.display = (!isNaN(a) && !isNaN(b) && a === b) ? 'block' : 'none';
+}
+window.togglePenaltisInput = togglePenaltisInput;
+
 async function saveResultado(jid) {
   const a = parseInt(document.getElementById('res-a').value);
   const b = parseInt(document.getElementById('res-b').value);
   if (isNaN(a)||isNaN(b)||a<0||b<0) return toast('⚠️ Placar inválido');
-  await fbUpdate(`jogos/${jid}`, { realA: a, realB: b });
+
+  const j = state.jogos.find(x => x.id === jid);
+  const isMataMata = j && !!classificarFaseMataMata(j.fase);
+  const empatou = a === b;
+
+  const updates = { realA: a, realB: b };
+
+  if (isMataMata && empatou) {
+    // Jogo de mata-mata empatado: exige o placar dos pênaltis para
+    // determinar o vencedor que avança na árvore
+    const penAEl = document.getElementById('res-pen-a');
+    const penBEl = document.getElementById('res-pen-b');
+    const penA = penAEl ? parseInt(penAEl.value) : NaN;
+    const penB = penBEl ? parseInt(penBEl.value) : NaN;
+    if (isNaN(penA) || isNaN(penB) || penA === penB) {
+      return toast('⚠️ Empate em jogo eliminatório: informe o placar dos pênaltis (sem empate)');
+    }
+    updates.penA = penA;
+    updates.penB = penB;
+  } else if (isMataMata && !empatou) {
+    // Não empatou mais: limpa pênaltis antigos, se existirem (correção de placar)
+    updates.penA = null;
+    updates.penB = null;
+  }
+
+  await fbUpdate(`jogos/${jid}`, updates);
   closeModal('modal-resultado');
   toast('✅ Resultado salvo! Ranking atualizado.');
 }
 window.saveResultado = saveResultado;
 
 async function clearResultado(jid) {
-  await fbUpdate(`jogos/${jid}`, { realA: null, realB: null });
+  await fbUpdate(`jogos/${jid}`, { realA: null, realB: null, penA: null, penB: null });
   closeModal('modal-resultado');
   toast('🗑 Resultado removido');
 }
@@ -2432,8 +2479,17 @@ function resolverResultadoJogo(jogoId, tipo) {
   if (!j.timeA || !j.timeB) return null; // confronto anterior ainda não definido
   const fin = j.realA !== null && j.realA !== undefined;
   if (!fin) return { nome: null, definido: false }; // times definidos mas sem resultado ainda
-  if (j.realA === j.realB) return { nome: null, definido: false, empate: true }; // mata-mata não pode empatar
-  const vencedorA = j.realA > j.realB;
+
+  let vencedorA;
+  if (j.realA === j.realB) {
+    // Empate no tempo normal: decide pelos pênaltis, se já informados
+    const temPenaltis = j.penA !== null && j.penA !== undefined && j.penB !== null && j.penB !== undefined && j.penA !== j.penB;
+    if (!temPenaltis) return { nome: null, definido: false, empate: true }; // aguardando pênaltis
+    vencedorA = j.penA > j.penB;
+  } else {
+    vencedorA = j.realA > j.realB;
+  }
+
   if (tipo === 'perdedores') {
     return { nome: vencedorA ? j.timeB : j.timeA, definido: true };
   }
@@ -3546,7 +3602,7 @@ function renderMataMataJogos(modo, aba) {
           </div>
           <div class="jogo-times">
             <div class="jogo-team">${j.timeA ? `${FLAGS_GRUPOS[j.timeA]||'🏳️'} ${j.timeA}` : '<span style="color:var(--text-dim);font-style:italic;">A definir</span>'}</div>
-            <div>${fin?`<div class="jogo-placar">${j.realA}–${j.realB}</div>`:`<div class="jogo-vs">VS</div>`}</div>
+            <div>${fin?`<div class="jogo-placar">${j.realA}–${j.realB}</div>${(j.penA!==null&&j.penA!==undefined)?`<div style="font-size:.65rem;color:var(--gold-light);text-align:center;margin-top:2px;">pên. ${j.penA}–${j.penB}</div>`:''}`:`<div class="jogo-vs">VS</div>`}</div>
             <div class="jogo-team right">${j.timeB ? `${j.timeB} ${FLAGS_GRUPOS[j.timeB]||'🏳️'}` : '<span style="color:var(--text-dim);font-style:italic;">A definir</span>'}</div>
           </div>
           <div class="jogo-btns">
