@@ -2445,14 +2445,14 @@ window.seedMataMata = seedMataMata;
 // Usa o mesmo padrão de IDs do seedMataMata (r32-1 .. r32-16).
 const ARVORE_MATA_MATA = {
   oitavas: [
-    { id:'oit-1', fase:'Oitavas', de:['r32-1','r32-2']  },
-    { id:'oit-2', fase:'Oitavas', de:['r32-3','r32-4']  },
-    { id:'oit-3', fase:'Oitavas', de:['r32-5','r32-6']  },
-    { id:'oit-4', fase:'Oitavas', de:['r32-7','r32-8']  },
-    { id:'oit-5', fase:'Oitavas', de:['r32-9','r32-10'] },
-    { id:'oit-6', fase:'Oitavas', de:['r32-11','r32-12']},
-    { id:'oit-7', fase:'Oitavas', de:['r32-13','r32-14']},
-    { id:'oit-8', fase:'Oitavas', de:['r32-15','r32-16']},
+    { id:'oit-1', fase:'Oitavas', de:['r32-1','r32-2'],   data:'04/07', hora:'18h' }, // Paraguai x França
+    { id:'oit-2', fase:'Oitavas', de:['r32-3','r32-4'],   data:'04/07', hora:'14h' }, // Canadá x Marrocos
+    { id:'oit-3', fase:'Oitavas', de:['r32-5','r32-6'],   data:'06/07', hora:'16h' }, // Portugal/Croácia x Espanha/Áustria
+    { id:'oit-4', fase:'Oitavas', de:['r32-7','r32-8'],   data:'06/07', hora:'21h' }, // EUA/Bósnia x Bélgica/Senegal
+    { id:'oit-5', fase:'Oitavas', de:['r32-9','r32-10'],  data:'05/07', hora:'17h' }, // Brasil x Noruega
+    { id:'oit-6', fase:'Oitavas', de:['r32-11','r32-12'], data:'05/07', hora:'21h' }, // México x Inglaterra
+    { id:'oit-7', fase:'Oitavas', de:['r32-13','r32-14'], data:'07/07', hora:'13h' }, // Argentina/Cabo Verde x Austrália/Egito
+    { id:'oit-8', fase:'Oitavas', de:['r32-15','r32-16'], data:'07/07', hora:'17h' }, // Suíça/Argélia x Colômbia/Gana
   ],
   quartas: [
     { id:'qua-1', fase:'Quartas', de:['oit-1','oit-2'] },
@@ -2461,14 +2461,14 @@ const ARVORE_MATA_MATA = {
     { id:'qua-4', fase:'Quartas', de:['oit-7','oit-8'] },
   ],
   semi: [
-    { id:'semi-1', fase:'Semifinal', de:['qua-1','qua-2'] },
-    { id:'semi-2', fase:'Semifinal', de:['qua-3','qua-4'] },
+    { id:'semi-1', fase:'Semifinal', de:['qua-1','qua-2'], data:'14/07', hora:'16h' },
+    { id:'semi-2', fase:'Semifinal', de:['qua-3','qua-4'], data:'15/07', hora:'16h' },
   ],
   final: [
-    { id:'final-1', fase:'Final', de:['semi-1','semi-2'], tipo:'vencedores' },
+    { id:'final-1', fase:'Final', de:['semi-1','semi-2'], tipo:'vencedores', data:'19/07', hora:'16h' },
   ],
   terceiro: [
-    { id:'terceiro-1', fase:'Disputa 3º Lugar', de:['semi-1','semi-2'], tipo:'perdedores' },
+    { id:'terceiro-1', fase:'Disputa 3º Lugar', de:['semi-1','semi-2'], tipo:'perdedores', data:'18/07', hora:'' },
   ],
 };
 
@@ -2516,14 +2516,18 @@ function resolverResultadoJogo(jogoId, tipo) {
 // ao admin), garantindo que TODO participante veja os confrontos corretos
 // assim que os resultados anteriores estiverem disponíveis via onValue.
 function calcularArvoreLocal() {
-  const mapa = {}; // jogoId -> { timeA, timeB }
+  const mapa = {}; // jogoId -> { timeA, timeB, data, hora, fase }
   ['oitavas','quartas','semi','final','terceiro'].forEach(faseKey => {
     ARVORE_MATA_MATA[faseKey].forEach(conf => {
       const [origemA, origemB] = conf.de;
       const tipo = conf.tipo === 'perdedores' ? 'perdedores' : 'vencedores';
       const rA = resolverResultadoJogo(origemA, tipo);
       const rB = resolverResultadoJogo(origemB, tipo);
-      mapa[conf.id] = { timeA: rA?.nome || '', timeB: rB?.nome || '', fase: conf.fase };
+      mapa[conf.id] = {
+        timeA: rA?.nome || '', timeB: rB?.nome || '',
+        data: conf.data || '', hora: conf.hora || '',
+        fase: conf.fase
+      };
     });
   });
   return mapa;
@@ -2547,18 +2551,31 @@ function jogosMataMataEfetivos() {
     const calc = local[id];
     const existente = porId[id];
     if (!existente) {
-      // Jogo ainda não existe no Firebase: usa o calculado, se tiver algum time
+      // Jogo ainda não existe no Firebase: usa o calculado, incluindo
+      // data/hora oficiais definidas em ARVORE_MATA_MATA, se tiver time
       if (calc.timeA || calc.timeB) {
-        porId[id] = { id, timeA: calc.timeA, timeB: calc.timeB, data:'', hora:'', fase: calc.fase, realA: null, realB: null };
+        porId[id] = { id, timeA: calc.timeA, timeB: calc.timeB, data: calc.data, hora: calc.hora, fase: calc.fase, realA: null, realB: null };
       }
     } else {
       // Jogo existe mas ainda sem resultado: garante que os nomes dos
-      // times estejam atualizados mesmo que o Firebase ainda não tenha
-      // recebido a escrita mais recente (proteção contra falha de permissão)
+      // times (e a data/hora oficial, se ainda não cadastrada) estejam
+      // atualizados mesmo que o Firebase ainda não tenha recebido a
+      // escrita mais recente (proteção contra falha de permissão)
       const jaTemResultado = existente.realA !== null && existente.realA !== undefined;
       if (!jaTemResultado) {
-        if ((calc.timeA && existente.timeA !== calc.timeA) || (calc.timeB && existente.timeB !== calc.timeB)) {
-          porId[id] = { ...existente, timeA: calc.timeA || existente.timeA, timeB: calc.timeB || existente.timeB };
+        const precisaAtualizar =
+          (calc.timeA && existente.timeA !== calc.timeA) ||
+          (calc.timeB && existente.timeB !== calc.timeB) ||
+          (calc.data && !existente.data) ||
+          (calc.hora && !existente.hora);
+        if (precisaAtualizar) {
+          porId[id] = {
+            ...existente,
+            timeA: calc.timeA || existente.timeA,
+            timeB: calc.timeB || existente.timeB,
+            data: existente.data || calc.data,
+            hora: existente.hora || calc.hora,
+          };
         }
       }
     }
@@ -2594,7 +2611,7 @@ async function avancarArvoreMataMata() {
         if (novoTimeA || novoTimeB) {
           updates[`jogos/${conf.id}`] = {
             id: conf.id, timeA: novoTimeA, timeB: novoTimeB,
-            data: '', hora: '', fase: conf.fase, realA: null, realB: null
+            data: conf.data || '', hora: conf.hora || '', fase: conf.fase, realA: null, realB: null
           };
           mudancas++;
         }
@@ -2609,6 +2626,15 @@ async function avancarArvoreMataMata() {
           }
           if (existente.timeB !== novoTimeB) {
             updates[`jogos/${conf.id}/timeB`] = novoTimeB;
+            mudancas++;
+          }
+          // Preenche data/hora oficiais se ainda estiverem vazias
+          if (!existente.data && conf.data) {
+            updates[`jogos/${conf.id}/data`] = conf.data;
+            mudancas++;
+          }
+          if (!existente.hora && conf.hora) {
+            updates[`jogos/${conf.id}/hora`] = conf.hora;
             mudancas++;
           }
         }
