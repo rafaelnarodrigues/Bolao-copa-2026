@@ -2387,27 +2387,35 @@ window.fixHorarios = fixHorarios;
 // SEED MATA-MATA — cadastra/atualiza os 16 jogos da Rodada de 32
 // com confrontos e horários oficiais confirmados.
 // ══════════════════════════════════════════
+// Lista oficial dos 16 confrontos da Rodada de 32 (fonte: FIFA/CBF).
+// Extraída como constante de módulo para ser reutilizada tanto pelo
+// seed inicial (seedMataMata) quanto pelo mecanismo de fallback que
+// localiza jogos mesmo quando foram salvos com um ID diferente do
+// padrão 'r32-N' (ex: cadastrados manualmente pelo admin).
+const SEED_R32_LISTA = [
+  { id:'r32-3',  timeA:'África do Sul',  timeB:'Canadá',     data:'28/06', hora:'16h',   fase:'Rodada de 32' },
+  { id:'r32-9',  timeA:'Brasil',         timeB:'Japão',      data:'29/06', hora:'14h',   fase:'Rodada de 32' },
+  { id:'r32-1',  timeA:'Alemanha',       timeB:'Paraguai',   data:'29/06', hora:'17h30', fase:'Rodada de 32' },
+  { id:'r32-4',  timeA:'Holanda',        timeB:'Marrocos',   data:'29/06', hora:'22h',   fase:'Rodada de 32' },
+  { id:'r32-10', timeA:'Costa do Marfim',timeB:'Noruega',    data:'30/06', hora:'14h',   fase:'Rodada de 32' },
+  { id:'r32-2',  timeA:'França',         timeB:'Suécia',     data:'30/06', hora:'18h',   fase:'Rodada de 32' },
+  { id:'r32-11', timeA:'México',         timeB:'Equador',    data:'30/06', hora:'22h',   fase:'Rodada de 32' },
+  { id:'r32-12', timeA:'Inglaterra',     timeB:'RD Congo',   data:'01/07', hora:'13h',   fase:'Rodada de 32' },
+  { id:'r32-8',  timeA:'Bélgica',        timeB:'Senegal',    data:'01/07', hora:'17h',   fase:'Rodada de 32' },
+  { id:'r32-7',  timeA:'Estados Unidos', timeB:'Bósnia',     data:'01/07', hora:'21h',   fase:'Rodada de 32' },
+  { id:'r32-6',  timeA:'Espanha',        timeB:'Áustria',    data:'02/07', hora:'16h',   fase:'Rodada de 32' },
+  { id:'r32-5',  timeA:'Portugal',       timeB:'Croácia',    data:'02/07', hora:'20h',   fase:'Rodada de 32' },
+  { id:'r32-15', timeA:'Suíça',          timeB:'Argélia',    data:'03/07', hora:'00h',   fase:'Rodada de 32' },
+  { id:'r32-14', timeA:'Austrália',      timeB:'Egito',      data:'03/07', hora:'15h',   fase:'Rodada de 32' },
+  { id:'r32-13', timeA:'Argentina',      timeB:'Cabo Verde', data:'03/07', hora:'19h',   fase:'Rodada de 32' },
+  { id:'r32-16', timeA:'Colômbia',       timeB:'Gana',       data:'03/07', hora:'22h30', fase:'Rodada de 32' },
+];
+const SEED_R32_POR_ID = Object.fromEntries(SEED_R32_LISTA.map(j => [j.id, j]));
+
 async function seedMataMata() {
   if (session.role !== 'admin') return;
 
-  const MATA_MATA_R32 = [
-    { id:'r32-3',  timeA:'África do Sul',  timeB:'Canadá',     data:'28/06', hora:'16h',   fase:'Rodada de 32' },
-    { id:'r32-9',  timeA:'Brasil',         timeB:'Japão',      data:'29/06', hora:'14h',   fase:'Rodada de 32' },
-    { id:'r32-1',  timeA:'Alemanha',       timeB:'Paraguai',   data:'29/06', hora:'17h30', fase:'Rodada de 32' },
-    { id:'r32-4',  timeA:'Holanda',        timeB:'Marrocos',   data:'29/06', hora:'22h',   fase:'Rodada de 32' },
-    { id:'r32-10', timeA:'Costa do Marfim',timeB:'Noruega',    data:'30/06', hora:'14h',   fase:'Rodada de 32' },
-    { id:'r32-2',  timeA:'França',         timeB:'Suécia',     data:'30/06', hora:'18h',   fase:'Rodada de 32' },
-    { id:'r32-11', timeA:'México',         timeB:'Equador',    data:'30/06', hora:'22h',   fase:'Rodada de 32' },
-    { id:'r32-12', timeA:'Inglaterra',     timeB:'RD Congo',   data:'01/07', hora:'13h',   fase:'Rodada de 32' },
-    { id:'r32-8',  timeA:'Bélgica',        timeB:'Senegal',    data:'01/07', hora:'17h',   fase:'Rodada de 32' },
-    { id:'r32-7',  timeA:'Estados Unidos', timeB:'Bósnia',     data:'01/07', hora:'21h',   fase:'Rodada de 32' },
-    { id:'r32-6',  timeA:'Espanha',        timeB:'Áustria',    data:'02/07', hora:'16h',   fase:'Rodada de 32' },
-    { id:'r32-5',  timeA:'Portugal',       timeB:'Croácia',    data:'02/07', hora:'20h',   fase:'Rodada de 32' },
-    { id:'r32-15', timeA:'Suíça',          timeB:'Argélia',    data:'03/07', hora:'00h',   fase:'Rodada de 32' },
-    { id:'r32-14', timeA:'Austrália',      timeB:'Egito',      data:'03/07', hora:'15h',   fase:'Rodada de 32' },
-    { id:'r32-13', timeA:'Argentina',      timeB:'Cabo Verde', data:'03/07', hora:'19h',   fase:'Rodada de 32' },
-    { id:'r32-16', timeA:'Colômbia',       timeB:'Gana',       data:'03/07', hora:'22h30', fase:'Rodada de 32' },
-  ];
+  const MATA_MATA_R32 = SEED_R32_LISTA;
 
   const updates = {};
   MATA_MATA_R32.forEach(j => {
@@ -2473,8 +2481,33 @@ const ARVORE_MATA_MATA = {
 };
 
 // Retorna { nome, definido } do vencedor (ou perdedor) de um jogo já cadastrado
+// Localiza o jogo correspondente a um ID da árvore. Busca primeiro pelo
+// ID exato (ex: 'r32-11'); se não encontrar, tenta achar por NOMES DE
+// TIMES batendo com o confronto original do seed — isso cobre o caso em
+// que o admin cadastrou/editou o jogo manualmente e ele acabou com um ID
+// diferente do gerado por seedMataMata (ex: 'j_1234567' em vez de 'r32-11').
+function encontrarJogoDaArvore(jogoId) {
+  const direto = state.jogos.find(x => x.id === jogoId);
+  if (direto) return direto;
+
+  // Fallback: descobre quais times esse ID de árvore deveria ter, a
+  // partir do seed original (MATA_MATA_R32) ou dos confrontos já
+  // calculados, e procura no state.jogos por esse par de times.
+  const doSeed = SEED_R32_POR_ID[jogoId];
+  if (doSeed) {
+    const match = state.jogos.find(x => {
+      if (!x.timeA || !x.timeB) return false;
+      const par = [normTxt(x.timeA), normTxt(x.timeB)].sort().join('|');
+      const parSeed = [normTxt(doSeed.timeA), normTxt(doSeed.timeB)].sort().join('|');
+      return par === parSeed && classificarFaseMataMata(x.fase)?.label === '🎯 Rodada de 32';
+    });
+    if (match) return match;
+  }
+  return null;
+}
+
 function resolverResultadoJogo(jogoId, tipo) {
-  const j = state.jogos.find(x => x.id === jogoId);
+  const j = encontrarJogoDaArvore(jogoId);
   if (!j) return null;
   if (!j.timeA || !j.timeB) return null; // confronto anterior ainda não definido
   const fin = j.realA !== null && j.realA !== undefined;
