@@ -492,6 +492,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <!-- SUB: OITAVAS -->
   <div id="jog-sub-oitavas" style="display:none;">
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-body">
+        <button class="btn btn-gold btn-full" style="margin-bottom:8px;" onclick="seedOitavaMexicoInglaterra()">⚡ Cadastrar México × Inglaterra agora</button>
+        <button class="btn btn-ghost btn-full" onclick="mostrarDiagnosticoOitavas()">🔍 Diagnosticar confrontos pendentes</button>
+        <div id="diagnostico-oitavas-box" style="display:none;margin-top:10px;"></div>
+      </div>
+    </div>
     <div id="jog-mata-content-oitavas"></div>
   </div>
 
@@ -2437,6 +2444,22 @@ async function seedMataMata() {
 }
 window.seedMataMata = seedMataMata;
 
+// Cadastra/corrige diretamente o confronto das Oitavas México × Inglaterra,
+// sem depender do cálculo automático — solução rápida e direta.
+async function seedOitavaMexicoInglaterra() {
+  if (session.role !== 'admin') return;
+  await fbUpdate('', {
+    'jogos/oit-6/timeA': 'México',
+    'jogos/oit-6/timeB': 'Inglaterra',
+    'jogos/oit-6/data': '05/07',
+    'jogos/oit-6/hora': '21h',
+    'jogos/oit-6/fase': 'Oitavas',
+    'jogos/oit-6/id': 'oit-6',
+  });
+  toast('✅ México × Inglaterra cadastrado nas Oitavas!');
+}
+window.seedOitavaMexicoInglaterra = seedOitavaMexicoInglaterra;
+
 // ══════════════════════════════════════════
 // ÁRVORE ELIMINATÓRIA AUTOMÁTICA
 // (Oitavas → Quartas → Semifinal → Final / Disputa 3º Lugar)
@@ -2490,9 +2513,8 @@ function encontrarJogoDaArvore(jogoId) {
   const direto = state.jogos.find(x => x.id === jogoId);
   if (direto) return direto;
 
-  // Fallback: descobre quais times esse ID de árvore deveria ter, a
-  // partir do seed original (MATA_MATA_R32) ou dos confrontos já
-  // calculados, e procura no state.jogos por esse par de times.
+  // Fallback 1: se for um ID de R32 (r32-N), procura pelo par de times
+  // do seed oficial dentro de jogos com fase "Rodada de 32"
   const doSeed = SEED_R32_POR_ID[jogoId];
   if (doSeed) {
     const match = state.jogos.find(x => {
@@ -2503,8 +2525,122 @@ function encontrarJogoDaArvore(jogoId) {
     });
     if (match) return match;
   }
+
   return null;
 }
+
+// Função de diagnóstico: expõe no console o estado da árvore para
+// facilitar identificar por que um confronto não está avançando.
+// Pode ser chamada manualmente no console do navegador: diagnosticarArvore()
+function diagnosticarArvore() {
+  console.log('═══ DIAGNÓSTICO DA ÁRVORE DE MATA-MATA ═══');
+  console.log('Total de jogos no state:', state.jogos.length);
+  const jogosR32 = state.jogos.filter(j => classificarFaseMataMata(j.fase)?.label === '🎯 Rodada de 32');
+  console.log('Jogos de Rodada de 32 encontrados:', jogosR32.length);
+  jogosR32.forEach(j => console.log(`  [${j.id}] ${j.timeA} ${j.realA??'?'} x ${j.realB??'?'} ${j.timeB}`));
+
+  console.log('\nVerificação r32-11 (México x Equador):');
+  console.log('  SEED_R32_POR_ID["r32-11"]:', SEED_R32_POR_ID['r32-11']);
+  const encontrado11 = encontrarJogoDaArvore('r32-11');
+  console.log('  encontrarJogoDaArvore("r32-11"):', encontrado11);
+  const resultado11 = resolverResultadoJogo('r32-11', 'vencedores');
+  console.log('  resolverResultadoJogo("r32-11"):', resultado11);
+
+  console.log('\nVerificação r32-12 (Inglaterra x RD Congo):');
+  const encontrado12 = encontrarJogoDaArvore('r32-12');
+  console.log('  encontrarJogoDaArvore("r32-12"):', encontrado12);
+  const resultado12 = resolverResultadoJogo('r32-12', 'vencedores');
+  console.log('  resolverResultadoJogo("r32-12"):', resultado12);
+
+  console.log('\noit-6 calculado:');
+  const local = calcularArvoreLocal();
+  console.log('  ', local['oit-6']);
+
+  console.log('\noit-6 no Firebase (se existir):');
+  console.log('  ', state.jogos.find(j => j.id === 'oit-6'));
+}
+window.diagnosticarArvore = diagnosticarArvore;
+
+// Versão visual do diagnóstico, exibida direto na aba Oitavas para o
+// admin conseguir ver sem precisar abrir o console do navegador.
+function mostrarDiagnosticoOitavas() {
+  const box = document.getElementById('diagnostico-oitavas-box');
+  if (!box) return;
+  const visivel = box.style.display !== 'none';
+  if (visivel) { box.style.display = 'none'; return; }
+
+  let html = '<div style="display:flex;flex-direction:column;gap:10px;">';
+
+  ARVORE_MATA_MATA.oitavas.forEach(conf => {
+    const [origemA, origemB] = conf.de;
+    const jogoA = encontrarJogoDaArvore(origemA);
+    const jogoB = encontrarJogoDaArvore(origemB);
+    const rA = resolverResultadoJogo(origemA, 'vencedores');
+    const rB = resolverResultadoJogo(origemB, 'vencedores');
+    const jogoOitava = state.jogos.find(j => j.id === conf.id);
+
+    function statusOrigem(id, jogo, r) {
+      if (!jogo) return `<span style="color:#ff8a8a;">${id}: ❌ NÃO ENCONTRADO no Firebase</span>`;
+      if (!jogo.timeA || !jogo.timeB) return `<span style="color:var(--text-dim);">${id}: times ainda vazios</span>`;
+      if (jogo.realA === null || jogo.realA === undefined) return `<span style="color:var(--gold-light);">${id}: ${jogo.timeA} x ${jogo.timeB} — ⏳ sem resultado lançado</span>`;
+      if (jogo.realA === jogo.realB && !(jogo.penA !== null && jogo.penA !== undefined && jogo.penA !== jogo.penB)) {
+        return `<span style="color:#ff8a8a;">${id}: ${jogo.timeA} ${jogo.realA}×${jogo.realB} ${jogo.timeB} — ⚠️ EMPATE sem pênaltis cadastrados!</span>`;
+      }
+      return `<span style="color:var(--green-light);">${id}: ${jogo.timeA} ${jogo.realA}×${jogo.realB} ${jogo.timeB} → vencedor: <strong>${r?.nome}</strong></span>`;
+    }
+
+    html += `
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:1px;color:var(--gold-light);margin-bottom:8px;">${conf.id.toUpperCase()}</div>
+        <div style="font-size:.78rem;line-height:1.8;">
+          ${statusOrigem(origemA, jogoA, rA)}<br>
+          ${statusOrigem(origemB, jogoB, rB)}
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);font-size:.78rem;">
+          <strong>Resultado esperado:</strong> ${rA?.nome || '(pendente)'} × ${rB?.nome || '(pendente)'}<br>
+          <strong>No Firebase (${conf.id}):</strong> ${jogoOitava ? `${jogoOitava.timeA || '(vazio)'} × ${jogoOitava.timeB || '(vazio)'}` : '<span style="color:var(--text-dim);">ainda não criado</span>'}
+          ${jogoOitava && jogoOitava.realA !== null && jogoOitava.realA !== undefined ? '<br><span style="color:#ff8a8a;">⚠️ Este confronto já tem RESULTADO lançado — por isso os times não são mais atualizados automaticamente.</span>' : ''}
+        </div>
+        ${(rA?.nome || rB?.nome) && jogoOitava && (jogoOitava.timeA !== (rA?.nome||jogoOitava.timeA) || jogoOitava.timeB !== (rB?.nome||jogoOitava.timeB)) && (jogoOitava.realA===null||jogoOitava.realA===undefined) ? `
+        <button class="btn btn-gold btn-sm btn-full" style="margin-top:8px;" onclick="forcarAtualizacaoConfronto('${conf.id}','${rA?.nome||''}','${rB?.nome||''}')">🔄 Corrigir times deste confronto agora</button>` : ''}
+      </div>`;
+  });
+
+  html += '</div>';
+  box.innerHTML = html;
+  box.style.display = 'block';
+}
+window.mostrarDiagnosticoOitavas = mostrarDiagnosticoOitavas;
+
+// Força a atualização manual dos times de um confronto específico da
+// árvore, ignorando qualquer estado desatualizado. Usado como botão de
+// emergência no painel de diagnóstico quando o avanço automático não
+// resolveu por algum motivo (ex: jogo criado antes com dados parciais
+// que o merge automático não substituiu corretamente).
+async function forcarAtualizacaoConfronto(confId, timeA, timeB) {
+  if (session.role !== 'admin') return;
+  const updates = {};
+  const existente = state.jogos.find(j => j.id === confId);
+  const confDef = [...ARVORE_MATA_MATA.oitavas, ...ARVORE_MATA_MATA.quartas, ...ARVORE_MATA_MATA.semi, ...ARVORE_MATA_MATA.final, ...ARVORE_MATA_MATA.terceiro]
+    .find(c => c.id === confId);
+
+  if (!existente) {
+    updates[`jogos/${confId}`] = {
+      id: confId, timeA: timeA||'', timeB: timeB||'',
+      data: confDef?.data||'', hora: confDef?.hora||'',
+      fase: confDef?.fase||'Oitavas', realA: null, realB: null
+    };
+  } else {
+    if (timeA) updates[`jogos/${confId}/timeA`] = timeA;
+    if (timeB) updates[`jogos/${confId}/timeB`] = timeB;
+  }
+
+  await fbUpdate('', updates);
+  toast('✅ Confronto atualizado manualmente!');
+  mostrarDiagnosticoOitavas(); // fecha
+  setTimeout(() => mostrarDiagnosticoOitavas(), 300); // reabre já atualizado
+}
+window.forcarAtualizacaoConfronto = forcarAtualizacaoConfronto;
 
 function resolverResultadoJogo(jogoId, tipo) {
   const j = encontrarJogoDaArvore(jogoId);
