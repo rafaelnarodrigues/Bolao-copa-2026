@@ -544,6 +544,17 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="card-header"><h2>Classificação</h2><span class="pill pill-gray" id="rank-fin">0 jogos</span></div>
     <div class="card-body" id="rank-lista" style="padding:12px 16px;"></div>
   </div>
+  <div class="card admin-only" id="card-duplicados">
+    <div class="card-header"><h2>🧹 Verificar Jogos Duplicados</h2></div>
+    <div class="card-body" style="padding:12px 16px;">
+      <button class="btn btn-ghost btn-full" onclick="mostrarJogosDuplicados()">🔍 Verificar duplicatas</button>
+      <div id="duplicados-box" style="display:none;margin-top:10px;"></div>
+    </div>
+  </div>
+  <div class="card admin-only" id="card-auditoria-mata" style="display:none;">
+    <div class="card-header"><h2>🔍 Auditoria — Pontuação Mata-Mata</h2></div>
+    <div class="card-body" id="auditoria-mata-content" style="padding:12px 16px;font-size:.78rem;"></div>
+  </div>
   <div class="card">
     <div class="card-header"><h2>💰 Premiação</h2></div>
     <div class="card-body" id="prem-content"></div>
@@ -2043,6 +2054,40 @@ function renderRanking() {
 
   const totalArr=state.participantes.reduce((s,p)=>s+(p.valor||100),0);
   const prem=document.getElementById('prem-content');
+
+  // ── Auditoria de pontuação do mata-mata (só admin) ──────
+  const auditCard = document.getElementById('card-auditoria-mata');
+  if (auditCard) {
+    if (session.role === 'admin') {
+      const jogosMataComResultado = state.jogos.filter(j =>
+        classificarFaseMataMata(j.fase) && j.realA !== null && j.realA !== undefined
+      );
+      if (jogosMataComResultado.length) {
+        auditCard.style.display = '';
+        auditCard.querySelector('#auditoria-mata-content').innerHTML = jogosMataComResultado.map(j => {
+          const mult = multiplicadorFase(j.fase);
+          const faseOk = !!j.fase && !!classificarFaseMataMata(j.fase);
+          const corMult = mult > 1 ? 'var(--green-light)' : '#ff8a8a';
+          return `
+            <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong>${j.timeA} ${j.realA}×${j.realB} ${j.timeB}</strong>
+                <span style="color:${corMult};font-family:'Bebas Neue',sans-serif;">×${mult}</span>
+              </div>
+              <div style="color:var(--text-dim);font-size:.7rem;margin-top:2px;">
+                fase salva: "${j.fase || '(vazia!)'}"
+                ${!faseOk ? ' — <span style="color:#ff8a8a;">⚠️ campo fase ausente/irreconhecível, multiplicador forçado a ×1</span>' : ''}
+              </div>
+            </div>`;
+        }).join('');
+      } else {
+        auditCard.style.display = 'none';
+      }
+    } else {
+      auditCard.style.display = 'none';
+    }
+  }
+
   const vencedor = ranking[0]?.nome || '—';
   prem.innerHTML = `
     <div style="text-align:center;padding:8px 0 14px;">
@@ -2444,6 +2489,116 @@ async function seedMataMata() {
 }
 window.seedMataMata = seedMataMata;
 
+// ══════════════════════════════════════════
+// LIMPEZA DE JOGOS DUPLICADOS
+// Detecta jogos de mata-mata com o mesmo par de times na mesma fase
+// (ex: "México x Equador" cadastrado manualmente E pelo seed automático,
+// gerando dois IDs diferentes para o mesmo confronto). Isso faz cada
+// palpite ser contado DUAS VEZES na pontuação de quem apostou nesse jogo.
+// A correção: mescla os palpites em um único jogo (mantém o resultado
+// oficial e o ID mais antigo) e remove o duplicado.
+// ══════════════════════════════════════════
+function detectarJogosDuplicados() {
+  const porChave = {};
+  state.jogos.forEach(j => {
+    const par = [normTxt(j.timeA||''), normTxt(j.timeB||'')].sort().join('|');
+    const chave = `${par}::${j.fase||''}`;
+    (porChave[chave] = porChave[chave] || []).push(j);
+  });
+  return Object.values(porChave).filter(grupo => grupo.length > 1);
+}
+
+async function corrigirJogosDuplicados() {
+  if (session.role !== 'admin') return;
+
+  const duplicados = detectarJogosDuplicados();
+  if (!duplicados.length) {
+    toast('✅ Nenhum jogo duplicado encontrado!');
+    return;
+  }
+
+  const updates = {};
+  let corrigidos = 0;
+
+  duplicados.forEach(grupo => {
+    // Prioriza o jogo com MAIS PALPITES registrados — é o que os
+    // participantes realmente usaram. Isso evita escolher por engano
+    // uma cópia criada pela árvore automática que tenha herdado um
+    // resultado incorreto (ex: 0x0) enquanto o jogo real tem o placar
+    // correto (ex: 1x1 decidido nos pênaltis).
+    const porPalpites = [...grupo].sort((a, b) => {
+      const nA = Object.keys(state.palpites[a.id] || {}).length;
+      const nB = Object.keys(state.palpites[b.id] || {}).length;
+      if (nB !== nA) return nB - nA; // mais palpites primeiro
+      // Empate em palpites: prioriza quem tem resultado lançado
+      const rA = a.realA !== null && a.realA !== undefined;
+      const rB = b.realA !== null && b.realA !== undefined;
+      if (rA !== rB) return rB ? 1 : -1;
+      return a.id.localeCompare(b.id);
+    });
+    const principal = porPalpites[0];
+    const outros = grupo.filter(j => j.id !== principal.id);
+
+    // Mescla os palpites de todos os duplicados para dentro do principal
+    outros.forEach(dup => {
+      const palDup = state.palpites[dup.id] || {};
+      Object.entries(palDup).forEach(([pid, pal]) => {
+        // Só copia se o participante ainda não tem palpite no jogo principal
+        const jaTemNoPrincipal = state.palpites[principal.id]?.[pid];
+        if (!jaTemNoPrincipal && pal && pal.a !== undefined && pal.a !== '') {
+          updates[`palpites/${principal.id}/${pid}`] = pal;
+        }
+      });
+      // Remove o jogo duplicado e seus palpites
+      updates[`jogos/${dup.id}`] = null;
+      updates[`palpites/${dup.id}`] = null;
+      corrigidos++;
+    });
+  });
+
+  await fbUpdate('', updates);
+  toast(`✅ ${corrigidos} jogo(s) duplicado(s) corrigido(s)! Ranking recalculado.`);
+}
+window.corrigirJogosDuplicados = corrigirJogosDuplicados;
+
+// Versão visual: mostra o que será corrigido antes de aplicar
+function mostrarJogosDuplicados() {
+  const box = document.getElementById('duplicados-box');
+  if (!box) return;
+  const duplicados = detectarJogosDuplicados();
+
+  if (!duplicados.length) {
+    box.innerHTML = '<div style="padding:10px;color:var(--green-light);font-size:.8rem;">✅ Nenhum jogo duplicado encontrado.</div>';
+    box.style.display = 'block';
+    return;
+  }
+
+  let html = `<div style="font-size:.78rem;color:#ff8a8a;margin-bottom:10px;">⚠️ ${duplicados.length} confronto(s) duplicado(s) encontrado(s):</div>`;
+  duplicados.forEach(grupo => {
+    // Verifica se os placares divergem entre as cópias
+    const placares = grupo
+      .filter(j => j.realA !== null && j.realA !== undefined)
+      .map(j => `${j.realA}x${j.realB}`);
+    const divergente = new Set(placares).size > 1;
+
+    html += `<div style="background:var(--bg3);border:1px solid rgba(230,57,70,.3);border-radius:8px;padding:10px;margin-bottom:8px;">
+      <strong style="font-size:.82rem;">${grupo[0].timeA} × ${grupo[0].timeB}</strong> <span style="color:var(--text-dim);font-size:.7rem;">(${grupo[0].fase})</span>
+      ${divergente ? '<div style="color:#ff8a8a;font-size:.7rem;margin-top:4px;">⚠️ Os placares divergem entre as cópias — confira qual está correto!</div>' : ''}
+      <div style="margin-top:6px;font-size:.72rem;color:var(--text-dim);">`;
+    grupo.forEach(j => {
+      const nPal = Object.keys(state.palpites[j.id]||{}).length;
+      const temRes = j.realA !== null && j.realA !== undefined;
+      html += `<div>• ID <code>${j.id}</code> — ${nPal} palpite(s)${temRes?` — resultado: ${j.realA}×${j.realB}`:' — sem resultado'}</div>`;
+    });
+    html += `</div></div>`;
+  });
+  html += `<button class="btn btn-gold btn-full" onclick="corrigirJogosDuplicados()">🔧 Corrigir todas as duplicatas agora</button>`;
+
+  box.innerHTML = html;
+  box.style.display = 'block';
+}
+window.mostrarJogosDuplicados = mostrarJogosDuplicados;
+
 // Cadastra/corrige diretamente o confronto das Oitavas México × Inglaterra,
 // sem depender do cálculo automático — solução rápida e direta.
 async function seedOitavaMexicoInglaterra() {
@@ -2611,6 +2766,46 @@ function mostrarDiagnosticoOitavas() {
   box.style.display = 'block';
 }
 window.mostrarDiagnosticoOitavas = mostrarDiagnosticoOitavas;
+
+// ══════════════════════════════════════════
+// AUDITORIA DE PONTUAÇÃO — verifica se algum jogo de mata-mata está
+// com o campo "fase" incorreto/vazio, o que faria o multiplicador
+// cair para ×1 e alterar a pontuação de todos os participantes.
+// ══════════════════════════════════════════
+function auditarPontuacaoJogo(jogoId) {
+  const j = state.jogos.find(x => x.id === jogoId);
+  if (!j) return console.log(`Jogo ${jogoId} não encontrado.`);
+
+  console.log(`═══ AUDITORIA: ${j.timeA} × ${j.timeB} [id: ${j.id}] ═══`);
+  console.log('Campo fase salvo:', JSON.stringify(j.fase));
+  const mult = multiplicadorFase(j.fase);
+  console.log('Multiplicador calculado:', `×${mult}`);
+  if (!j.fase) {
+    console.log('❌ PROBLEMA CONFIRMADO: campo "fase" está vazio/undefined — multiplicador forçado a ×1.');
+  }
+  console.log('Placar oficial:', `${j.realA} × ${j.realB}`);
+  console.log();
+  console.log('Pontuação de cada participante neste jogo:');
+  state.participantes.forEach(p => {
+    const pal = (state.palpites[j.id]||{})[p.id]||{};
+    if (pal.a === undefined || pal.a === '') {
+      console.log(`  ${p.nome}: sem palpite`);
+      return;
+    }
+    const pts = calcPontos(j, pal);
+    console.log(`  ${p.nome}: palpitou ${pal.a}×${pal.b} → ${pts} pts`);
+  });
+}
+window.auditarPontuacaoJogo = auditarPontuacaoJogo;
+
+// Corrige o campo "fase" de um jogo específico, caso a auditoria
+// confirme que ele está errado/vazio.
+async function corrigirFaseJogo(jogoId, faseCorreta) {
+  if (session.role !== 'admin') return;
+  await fbUpdate(`jogos/${jogoId}`, { fase: faseCorreta });
+  toast(`✅ Fase corrigida para "${faseCorreta}"! Ranking recalculado.`);
+}
+window.corrigirFaseJogo = corrigirFaseJogo;
 
 // Força a atualização manual dos times de um confronto específico da
 // árvore, ignorando qualquer estado desatualizado. Usado como botão de
