@@ -429,6 +429,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <button class="grupo-tab-btn" id="pal-sub-quartas-btn" onclick="showPalSubtab('quartas')">🥈 Quartas</button>
     <button class="grupo-tab-btn" id="pal-sub-semi-btn" onclick="showPalSubtab('semi')">🥉 Semis</button>
     <button class="grupo-tab-btn" id="pal-sub-final-btn" onclick="showPalSubtab('final')">🏆 Final</button>
+    <button class="grupo-tab-btn" id="pal-sub-bonus-btn" onclick="showPalSubtab('bonus')">🌟 Campeão &amp; Artilheiro</button>
   </div>
   <div id="pal-content"></div>
   <div id="pal-mata-content" style="display:none;">
@@ -438,6 +439,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="pal-mata-content-semi" style="display:none;"></div>
     <div id="pal-mata-content-final" style="display:none;"></div>
   </div>
+  <div id="pal-bonus-content" style="display:none;"></div>
 </div>
 
 <!-- JOGOS (admin only) -->
@@ -563,8 +565,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="card" id="card-bonus">
     <div class="card-header"><h2>🎯 Bônus Globais</h2></div>
     <div class="card-body">
-      <div class="form-group"><label>🏆 Campeão Real (+15 pts)</label><input type="text" id="bonus-campeao" placeholder="Ex: Brasil" oninput="saveBonusReal()" autocomplete="off"/></div>
-      <div class="form-group"><label>🥅 Artilheiro Real (+10 pts)</label><input type="text" id="bonus-artilheiro" placeholder="Ex: Vinicius Jr" oninput="saveBonusReal()" autocomplete="off"/></div>
+      <div class="form-group"><label>🏆 Campeão Real (+25 pts)</label><input type="text" id="bonus-campeao" placeholder="Ex: Brasil" oninput="saveBonusReal()" autocomplete="off"/></div>
+      <div class="form-group"><label>🥅 Artilheiro Real (+15 pts)</label><input type="text" id="bonus-artilheiro" placeholder="Ex: Vinicius Jr" oninput="saveBonusReal()" autocomplete="off"/></div>
       <div class="ok-box">Preencha ao final da Copa — pontos bônus são liberados automaticamente para todos.</div>
     </div>
   </div>
@@ -733,12 +735,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="card"><div class="card-header"><h2>🌟 Bônus</h2></div><div class="card-body">
     <div style="background:rgba(255,223,0,.08);border:1px solid rgba(255,223,0,.22);border-radius:10px;padding:14px;margin-bottom:10px;">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:4px;">🏆 Campeão da Copa</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--gold-light);">+15 pontos</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--gold-light);">+25 pontos</div>
       <div style="font-size:.8rem;color:var(--text-dim);margin-top:4px;">Se o time escolhido for campeão mundial.</div>
     </div>
     <div style="background:rgba(0,210,106,.08);border:1px solid rgba(0,210,106,.22);border-radius:10px;padding:14px;">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:4px;">🥅 Artilheiro da Copa</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green-light);">+10 pontos</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green-light);">+15 pontos</div>
       <div style="font-size:.8rem;color:var(--text-dim);margin-top:4px;">Se o jogador escolhido for o artilheiro oficial.</div>
     </div>
   </div></div>
@@ -1579,7 +1581,7 @@ function renderPalpites() {
     </div>
     <div class="pal-bonus-card">
       <div class="pal-bonus-title">Palpites Especiais</div>
-      <div class="pal-bonus-desc">Campeão (+15 pts) e Artilheiro (+10 pts) da Copa. <strong style="color:var(--gold-light);">Definidos no cadastro — não é possível alterar.</strong></div>
+      <div class="pal-bonus-desc">Campeão (+25 pts) e Artilheiro (+15 pts) da Copa. <strong style="color:var(--gold-light);">Definidos no cadastro — não é possível alterar.</strong></div>
       <div class="form-group">
         <label>🏆 Campeão da Copa</label>
         <div style="background:var(--bg4);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:.95rem;color:${p.campeao?'var(--text)':'var(--text-dim)'};">
@@ -1966,6 +1968,11 @@ function renderOutrosPalpites(jogo, myPid) {
 // Rodada de 32 / Oitavas / Quartas = x2
 // Semifinal / Disputa 3º = x3
 // Final = x4
+// Pontos de bônus por acertar o campeão/artilheiro real da Copa.
+// Definidos como constantes para facilitar ajuste futuro.
+const BONUS_PTS_CAMPEAO = 25;
+const BONUS_PTS_ARTILHEIRO = 15;
+
 function multiplicadorFase(fase) {
   if (!fase) return 1;
   // Ordem importa: checar fases mais específicas antes de "Final"
@@ -1999,7 +2006,7 @@ function calcTotalPlayer(p) {
   });
   const acCampeao=!!(state.campeaoReal&&p.campeao&&p.campeao.toLowerCase().trim()===state.campeaoReal.toLowerCase().trim());
   const acArtilheiro=!!(state.artilheiroReal&&p.artilheiro&&p.artilheiro.toLowerCase().trim()===state.artilheiroReal.toLowerCase().trim());
-  return total+(acCampeao?15:0)+(acArtilheiro?10:0);
+  return total+(acCampeao?BONUS_PTS_CAMPEAO:0)+(acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
 }
 
 function calcRanking() {
@@ -2015,7 +2022,7 @@ function calcRanking() {
     });
     const acCampeao=!!(state.campeaoReal&&p.campeao&&p.campeao.toLowerCase().trim()===state.campeaoReal.toLowerCase().trim());
     const acArtilheiro=!!(state.artilheiroReal&&p.artilheiro&&p.artilheiro.toLowerCase().trim()===state.artilheiroReal.toLowerCase().trim());
-    const bonus=(acCampeao?15:0)+(acArtilheiro?10:0);
+    const bonus=(acCampeao?BONUS_PTS_CAMPEAO:0)+(acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
     return{...p,total:total+bonus,exatos,vencedores,acCampeao};
   }).sort((a,b)=>{
     if(b.total!==a.total)return b.total-a.total;
@@ -2237,7 +2244,7 @@ function renderHistorico() {
       p.campeao.toLowerCase().trim() === state.campeaoReal.toLowerCase().trim());
     const acArtilheiro = !!(state.artilheiroReal && p.artilheiro &&
       p.artilheiro.toLowerCase().trim() === state.artilheiroReal.toLowerCase().trim());
-    const bonus = (acCampeao?15:0) + (acArtilheiro?10:0);
+    const bonus = (acCampeao?BONUS_PTS_CAMPEAO:0) + (acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
     if (bonus) vals[vals.length-1] += bonus;
 
     const isMe = session.role === 'player' && p.nome.toLowerCase() === myName;
@@ -3648,15 +3655,19 @@ let jogSubtab = 'grupos';
 function showPalSubtab(tab) {
   palSubtab = tab;
   const isMata = MM_ABAS.includes(tab);
+  const isBonus = tab === 'bonus';
   document.getElementById('pal-content').style.display = tab === 'grupos' ? '' : 'none';
   document.getElementById('pal-mata-content').style.display = isMata ? '' : 'none';
+  document.getElementById('pal-bonus-content').style.display = isBonus ? '' : 'none';
   document.getElementById('pal-sub-grupos-btn').classList.toggle('active', tab === 'grupos');
+  document.getElementById('pal-sub-bonus-btn').classList.toggle('active', isBonus);
   MM_ABAS.forEach(a => {
     document.getElementById(`pal-sub-${a}-btn`).classList.toggle('active', tab === a);
     const el = document.getElementById(`pal-mata-content-${a}`);
     if (el) el.style.display = tab === a ? '' : 'none';
   });
   if (isMata) renderMataMataJogos('pal', tab);
+  if (isBonus) renderBonusPalpites();
 }
 window.showPalSubtab = showPalSubtab;
 
@@ -3673,6 +3684,81 @@ function showJogSubtab(tab) {
   if (isMata) renderMataMataJogos('jog', tab);
 }
 window.showJogSubtab = showJogSubtab;
+
+// ══════════════════════════════════════════
+// PALPITES DE CAMPEÃO E ARTILHEIRO — visão de todos os participantes
+// Visível tanto para o organizador quanto para os próprios participantes
+// (aba Palpites → 🌟 Campeão & Artilheiro).
+// ══════════════════════════════════════════
+function renderBonusPalpites() {
+  const c = document.getElementById('pal-bonus-content');
+  if (!c) return;
+
+  if (!state.participantes.length) {
+    c.innerHTML = `<div class="empty" style="padding:30px;"><div class="eico">🌟</div><p>Nenhum participante cadastrado ainda.</p></div>`;
+    return;
+  }
+
+  const campeaoReal = (state.campeaoReal||'').trim();
+  const artilheiroReal = (state.artilheiroReal||'').trim();
+  const isPlayer = session.role === 'player';
+  const myName = session.playerName?.toLowerCase();
+
+  const linhas = state.participantes.map(p => {
+    const isMe = isPlayer && p.nome.toLowerCase() === myName;
+    const acertouCampeao = campeaoReal && p.campeao && p.campeao.trim().toLowerCase() === campeaoReal.toLowerCase();
+    const acertouArtilheiro = artilheiroReal && p.artilheiro && p.artilheiro.trim().toLowerCase() === artilheiroReal.toLowerCase();
+
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.05);${isMe?'background:rgba(255,223,0,.05);':''}">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:.92rem;font-weight:700;${isMe?'color:var(--gold-light);':''}">
+            ${p.nome}${isMe?' <span class="meu-tag">você</span>':''}
+          </div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:.65rem;color:var(--text-dim);margin-bottom:2px;">🏆 Campeão</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.5px;${p.campeao?'':'color:var(--text-dim);font-style:italic;'}">
+            ${p.campeao || 'não informado'} ${acertouCampeao?'✅':''}
+          </div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:.65rem;color:var(--text-dim);margin-bottom:2px;">🥅 Artilheiro</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.5px;${p.artilheiro?'':'color:var(--text-dim);font-style:italic;'}">
+            ${p.artilheiro || 'não informado'} ${acertouArtilheiro?'✅':''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Resumo do gabarito oficial (se já definido pelo organizador)
+  const gabaritoHtml = (campeaoReal || artilheiroReal) ? `
+    <div style="background:rgba(0,156,59,.08);border:1px solid rgba(0,156,59,.25);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:1.5px;color:var(--green-light);margin-bottom:6px;">✅ GABARITO OFICIAL</div>
+      <div style="font-size:.82rem;line-height:1.7;">
+        ${campeaoReal ? `🏆 Campeão: <strong>${campeaoReal}</strong> (+${BONUS_PTS_CAMPEAO} pts para quem acertou)<br>` : '🏆 Campeão: <span style="color:var(--text-dim);">ainda não definido</span><br>'}
+        ${artilheiroReal ? `🥅 Artilheiro: <strong>${artilheiroReal}</strong> (+${BONUS_PTS_ARTILHEIRO} pts para quem acertou)` : '🥅 Artilheiro: <span style="color:var(--text-dim);">ainda não definido</span>'}
+      </div>
+    </div>` : `
+    <div class="info-box" style="margin-bottom:14px;">ℹ️ O organizador ainda não definiu o campeão/artilheiro oficial. Os acertos (✅) aparecerão aqui assim que forem confirmados.</div>`;
+
+  c.innerHTML = `
+    <div class="card">
+      <div class="card-header"><h2>🌟 Palpites de Campeão &amp; Artilheiro</h2></div>
+      <div class="card-body" style="padding:14px 16px;">
+        ${gabaritoHtml}
+        <div style="display:flex;align-items:center;gap:12px;padding:0 14px 8px;font-size:.68rem;color:var(--text-dim);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;text-transform:uppercase;">
+          <div style="flex:1;">Participante</div>
+          <div style="flex:1;text-align:center;">Campeão</div>
+          <div style="flex:1;text-align:center;">Artilheiro</div>
+        </div>
+        <div style="border-top:1px solid var(--border);">
+          ${linhas}
+        </div>
+      </div>
+    </div>`;
+}
+window.renderBonusPalpites = renderBonusPalpites;
 
 // ══════════════════════════════════════════
 // CONFRONTOS OFICIAIS DA RODADA DE 32 (FIFA 2026)
@@ -4222,6 +4308,7 @@ function refresh(){
   if (copaSubtab === 'classificados') renderClassificados();
   if (MM_ABAS.includes(palSubtab)) renderMataMataJogos('pal', palSubtab);
   if (MM_ABAS.includes(jogSubtab)) renderMataMataJogos('jog', jogSubtab);
+  if (palSubtab === 'bonus') renderBonusPalpites();
 
   // Avança a árvore do mata-mata automaticamente. Roda em QUALQUER sessão
   // logada (admin ou participante) — é seguro porque avancarArvoreMataMata()
