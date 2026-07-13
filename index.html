@@ -2005,7 +2005,7 @@ function calcTotalPlayer(p) {
     total+=calcPontos(j,pal);
   });
   const acCampeao=!!(state.campeaoReal&&p.campeao&&p.campeao.toLowerCase().trim()===state.campeaoReal.toLowerCase().trim());
-  const acArtilheiro=!!(state.artilheiroReal&&p.artilheiro&&p.artilheiro.toLowerCase().trim()===state.artilheiroReal.toLowerCase().trim());
+  const acArtilheiro=matchArtilheiro(p.artilheiro, state.artilheiroReal);
   return total+(acCampeao?BONUS_PTS_CAMPEAO:0)+(acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
 }
 
@@ -2021,7 +2021,7 @@ function calcRanking() {
       if(pts>=2*mult)vencedores++;
     });
     const acCampeao=!!(state.campeaoReal&&p.campeao&&p.campeao.toLowerCase().trim()===state.campeaoReal.toLowerCase().trim());
-    const acArtilheiro=!!(state.artilheiroReal&&p.artilheiro&&p.artilheiro.toLowerCase().trim()===state.artilheiroReal.toLowerCase().trim());
+    const acArtilheiro=matchArtilheiro(p.artilheiro, state.artilheiroReal);
     const bonus=(acCampeao?BONUS_PTS_CAMPEAO:0)+(acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
     return{...p,total:total+bonus,exatos,vencedores,acCampeao};
   }).sort((a,b)=>{
@@ -2242,8 +2242,7 @@ function renderHistorico() {
     // Bônus: adiciona ao último dia
     const acCampeao = !!(state.campeaoReal && p.campeao &&
       p.campeao.toLowerCase().trim() === state.campeaoReal.toLowerCase().trim());
-    const acArtilheiro = !!(state.artilheiroReal && p.artilheiro &&
-      p.artilheiro.toLowerCase().trim() === state.artilheiroReal.toLowerCase().trim());
+    const acArtilheiro = matchArtilheiro(p.artilheiro, state.artilheiroReal);
     const bonus = (acCampeao?BONUS_PTS_CAMPEAO:0) + (acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
     if (bonus) vals[vals.length-1] += bonus;
 
@@ -3026,6 +3025,20 @@ function normTxt(s) {
     .replace(/ó|ô|õ/g,'o').replace(/ú/g,'u').replace(/ç/g,'c');
 }
 
+// Compara dois nomes de jogador (artilheiro) de forma flexível:
+// ignora acentos/maiúsculas e reconhece como o mesmo jogador quando
+// um nome está contido no outro (ex: "Mbappe" ↔ "Kylian Mbappé").
+// Evita falso positivo com nomes muito curtos (menos de 3 letras).
+function matchArtilheiro(nomeA, nomeB) {
+  if (!nomeA || !nomeB) return false;
+  const a = normTxt(nomeA);
+  const b = normTxt(nomeB);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.length < 3 || b.length < 3) return false;
+  return a.includes(b) || b.includes(a);
+}
+
 // Conta quantos jogos estão desatualizados em relação à tabela oficial
 function countJogosSemHora() {
   const mapa = {};
@@ -3707,7 +3720,7 @@ function renderBonusPalpites() {
   const linhas = state.participantes.map(p => {
     const isMe = isPlayer && p.nome.toLowerCase() === myName;
     const acertouCampeao = campeaoReal && p.campeao && p.campeao.trim().toLowerCase() === campeaoReal.toLowerCase();
-    const acertouArtilheiro = artilheiroReal && p.artilheiro && p.artilheiro.trim().toLowerCase() === artilheiroReal.toLowerCase();
+    const acertouArtilheiro = matchArtilheiro(p.artilheiro, artilheiroReal);
 
     return `
       <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.05);${isMe?'background:rgba(255,223,0,.05);':''}">
