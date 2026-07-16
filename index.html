@@ -566,7 +566,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="card-header"><h2>🎯 Bônus Globais</h2></div>
     <div class="card-body">
       <div class="form-group"><label>🏆 Campeão Real (+25 pts)</label><input type="text" id="bonus-campeao" placeholder="Ex: Brasil" oninput="saveBonusReal()" autocomplete="off"/></div>
-      <div class="form-group"><label>🥅 Artilheiro Real (+15 pts)</label><input type="text" id="bonus-artilheiro" placeholder="Ex: Vinicius Jr" oninput="saveBonusReal()" autocomplete="off"/></div>
+      <div class="form-group"><label>🥅 Artilheiro(s) Real(is) (+15 pts cada)</label><input type="text" id="bonus-artilheiro" placeholder="Ex: Mbappé, Haaland (separe por vírgula se dividido)" oninput="saveBonusReal()" autocomplete="off"/></div>
       <div class="ok-box">Preencha ao final da Copa — pontos bônus são liberados automaticamente para todos.</div>
     </div>
   </div>
@@ -741,7 +741,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div style="background:rgba(0,210,106,.08);border:1px solid rgba(0,210,106,.22);border-radius:10px;padding:14px;">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:4px;">🥅 Artilheiro da Copa</div>
       <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--green-light);">+15 pontos</div>
-      <div style="font-size:.8rem;color:var(--text-dim);margin-top:4px;">Se o jogador escolhido for o artilheiro oficial.</div>
+      <div style="font-size:.8rem;color:var(--text-dim);margin-top:4px;">Se o jogador escolhido for o artilheiro oficial. Em caso de artilharia dividida, todos que acertaram algum dos artilheiros empatados ganham o bônus.</div>
     </div>
   </div></div>
   <div class="card"><div class="card-header"><h2>⚖️ Desempate</h2></div><div class="card-body">
@@ -2005,7 +2005,7 @@ function calcTotalPlayer(p) {
     total+=calcPontos(j,pal);
   });
   const acCampeao=!!(state.campeaoReal&&p.campeao&&p.campeao.toLowerCase().trim()===state.campeaoReal.toLowerCase().trim());
-  const acArtilheiro=matchArtilheiro(p.artilheiro, state.artilheiroReal);
+  const acArtilheiro=matchArtilheiroMultiplo(p.artilheiro, state.artilheiroReal);
   return total+(acCampeao?BONUS_PTS_CAMPEAO:0)+(acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
 }
 
@@ -2021,7 +2021,7 @@ function calcRanking() {
       if(pts>=2*mult)vencedores++;
     });
     const acCampeao=!!(state.campeaoReal&&p.campeao&&p.campeao.toLowerCase().trim()===state.campeaoReal.toLowerCase().trim());
-    const acArtilheiro=matchArtilheiro(p.artilheiro, state.artilheiroReal);
+    const acArtilheiro=matchArtilheiroMultiplo(p.artilheiro, state.artilheiroReal);
     const bonus=(acCampeao?BONUS_PTS_CAMPEAO:0)+(acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
     return{...p,total:total+bonus,exatos,vencedores,acCampeao};
   }).sort((a,b)=>{
@@ -2242,7 +2242,7 @@ function renderHistorico() {
     // Bônus: adiciona ao último dia
     const acCampeao = !!(state.campeaoReal && p.campeao &&
       p.campeao.toLowerCase().trim() === state.campeaoReal.toLowerCase().trim());
-    const acArtilheiro = matchArtilheiro(p.artilheiro, state.artilheiroReal);
+    const acArtilheiro = matchArtilheiroMultiplo(p.artilheiro, state.artilheiroReal);
     const bonus = (acCampeao?BONUS_PTS_CAMPEAO:0) + (acArtilheiro?BONUS_PTS_ARTILHEIRO:0);
     if (bonus) vals[vals.length-1] += bonus;
 
@@ -3039,6 +3039,22 @@ function matchArtilheiro(nomeA, nomeB) {
   return a.includes(b) || b.includes(a);
 }
 
+// Suporta artilharia dividida: o gabarito oficial pode conter vários
+// nomes separados por vírgula (ex: "Mbappé, Haaland, Vinicius Jr").
+// Retorna true se o palpite do participante bater com QUALQUER um deles.
+function listaArtilheiros(gabaritoTexto) {
+  return (gabaritoTexto || '')
+    .split(',')
+    .map(n => n.trim())
+    .filter(Boolean);
+}
+
+function matchArtilheiroMultiplo(palpiteParticipante, gabaritoTexto) {
+  const lista = listaArtilheiros(gabaritoTexto);
+  if (!lista.length) return false;
+  return lista.some(nomeOficial => matchArtilheiro(palpiteParticipante, nomeOficial));
+}
+
 // Conta quantos jogos estão desatualizados em relação à tabela oficial
 function countJogosSemHora() {
   const mapa = {};
@@ -3720,7 +3736,7 @@ function renderBonusPalpites() {
   const linhas = state.participantes.map(p => {
     const isMe = isPlayer && p.nome.toLowerCase() === myName;
     const acertouCampeao = campeaoReal && p.campeao && p.campeao.trim().toLowerCase() === campeaoReal.toLowerCase();
-    const acertouArtilheiro = matchArtilheiro(p.artilheiro, artilheiroReal);
+    const acertouArtilheiro = matchArtilheiroMultiplo(p.artilheiro, artilheiroReal);
 
     return `
       <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.05);${isMe?'background:rgba(255,223,0,.05);':''}">
@@ -3745,12 +3761,17 @@ function renderBonusPalpites() {
   }).join('');
 
   // Resumo do gabarito oficial (se já definido pelo organizador)
+  const artilheirosLista = listaArtilheiros(artilheiroReal);
+  const artilheiroLabel = artilheirosLista.length > 1
+    ? artilheirosLista.map(n => `<strong>${n}</strong>`).join(' + ') + ' <span style="color:var(--text-dim);">(artilharia dividida)</span>'
+    : artilheirosLista.length === 1 ? `<strong>${artilheirosLista[0]}</strong>` : '';
+
   const gabaritoHtml = (campeaoReal || artilheiroReal) ? `
     <div style="background:rgba(0,156,59,.08);border:1px solid rgba(0,156,59,.25);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
       <div style="font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:1.5px;color:var(--green-light);margin-bottom:6px;">✅ GABARITO OFICIAL</div>
       <div style="font-size:.82rem;line-height:1.7;">
         ${campeaoReal ? `🏆 Campeão: <strong>${campeaoReal}</strong> (+${BONUS_PTS_CAMPEAO} pts para quem acertou)<br>` : '🏆 Campeão: <span style="color:var(--text-dim);">ainda não definido</span><br>'}
-        ${artilheiroReal ? `🥅 Artilheiro: <strong>${artilheiroReal}</strong> (+${BONUS_PTS_ARTILHEIRO} pts para quem acertou)` : '🥅 Artilheiro: <span style="color:var(--text-dim);">ainda não definido</span>'}
+        ${artilheiroLabel ? `🥅 Artilheiro${artilheirosLista.length>1?'s':''}: ${artilheiroLabel} (+${BONUS_PTS_ARTILHEIRO} pts para quem acertou qualquer um)` : '🥅 Artilheiro: <span style="color:var(--text-dim);">ainda não definido</span>'}
       </div>
     </div>` : `
     <div class="info-box" style="margin-bottom:14px;">ℹ️ O organizador ainda não definiu o campeão/artilheiro oficial. Os acertos (✅) aparecerão aqui assim que forem confirmados.</div>`;
