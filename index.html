@@ -2043,7 +2043,24 @@ function renderRanking() {
   if(!lista)return;
 
   const myName=session.playerName?.toLowerCase();
-  if(!ranking.length){lista.innerHTML='<div class="empty"><div class="eico">🏆</div><p>Sem participantes.</p></div>';return;}
+  if(!ranking.length){
+    lista.innerHTML='<div class="empty"><div class="eico">🏆</div><p>Sem participantes.</p></div>';
+    // Mesmo sem participantes, o admin precisa ver o card de Bônus Globais
+    // para poder definir o campeão/artilheiro assim que quiser
+    const cardBonusVazio = document.getElementById('card-bonus');
+    if (cardBonusVazio) {
+      if (session.role === 'admin') {
+        const bc = document.getElementById('bonus-campeao');
+        const ba = document.getElementById('bonus-artilheiro');
+        if (bc && document.activeElement !== bc) bc.value = state.campeaoReal || '';
+        if (ba && document.activeElement !== ba) ba.value = state.artilheiroReal || '';
+        cardBonusVazio.style.display = '';
+      } else {
+        cardBonusVazio.style.display = 'none';
+      }
+    }
+    return;
+  }
   lista.innerHTML=ranking.map((p,i)=>{
     const pos=i+1;
     const posCls=pos===1?'rank-1':pos===2?'rank-2':pos===3?'rank-3':'rank-other';
